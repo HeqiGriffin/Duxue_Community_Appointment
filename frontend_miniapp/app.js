@@ -1,3 +1,8 @@
+wx.cloud.init({
+  env: 'love-my-duxue-d7gve6bvl44cda5f7',
+  traceUser: true,
+})
+
 App({
   globalData: {
     // 微信开发者工具本地联调默认地址；真机/生产必须改为已备案 HTTPS 业务域名。
