@@ -1,0 +1,55 @@
+.home-page { padding-bottom: 64rpx; }
+.hero { margin: -32rpx -32rpx 0; padding: 46rpx 32rpx 44rpx; background: linear-gradient(135deg, #1557b0, #1f6feb); color: #fff; border-radius: 0 0 38rpx 38rpx; }
+.hero-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.hello { font-size: 40rpx; font-weight: 800; }
+.identity { margin-top: 10rpx; opacity: .82; font-size: 24rpx; }
+.logout { padding: 12rpx 18rpx; border-radius: 999rpx; background: rgba(255,255,255,.14); font-size: 23rpx; }
+.mode-row { display: flex; align-items: center; margin-top: 32rpx; }
+.mode-pill { padding: 8rpx 18rpx; border-radius: 999rpx; background: rgba(255,255,255,.16); font-size: 22rpx; }
+.mode-state { margin-left: 18rpx; font-size: 23rpx; opacity: .92; }
+.frozen-text { color: #ffe6a8; font-weight: 700; }
+.freeze-banner { margin-top: 24rpx; padding: 24rpx; display: flex; align-items: center; background: #fff7e6; border: 2rpx solid #ffdf9a; border-radius: 24rpx; }
+.freeze-icon { flex: 0 0 auto; width: 54rpx; height: 54rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #ffb020; color: #fff; font-weight: 800; }
+.freeze-content { flex: 1; margin-left: 18rpx; }
+.freeze-title { font-size: 27rpx; font-weight: 700; color: #7a4a00; }
+.freeze-note { margin-top: 5rpx; font-size: 22rpx; line-height: 1.5; color: #8c641f; }
+.freeze-action { flex: 0 0 auto; margin-left: 14rpx; color: #b35d00; font-size: 25rpx; font-weight: 700; }
+.quick-grid { display: flex; justify-content: space-between; margin-top: 28rpx; }
+.quick-card { box-sizing: border-box; width: calc(50% - 10rpx); padding: 28rpx; border-radius: 28rpx; background: #fff; box-shadow: 0 10rpx 30rpx rgba(23,43,77,.06); }
+.primary-card { background: #edf5ff; }
+.quick-icon { width: 58rpx; height: 58rpx; display: flex; align-items: center; justify-content: center; border-radius: 18rpx; background: #1f6feb; color: #fff; font-size: 36rpx; font-weight: 700; }
+.qr-icon { background: #eef2f7; color: #344054; }
+.quick-title { margin-top: 22rpx; font-size: 30rpx; font-weight: 800; }
+.quick-note { margin-top: 7rpx; color: #7a8699; font-size: 22rpx; }
+.stats { margin-top: 22rpx; display: flex; align-items: center; justify-content: space-around; padding: 24rpx 18rpx; }
+.stat-item { flex: 1; text-align: center; }
+.stat-num { font-size: 38rpx; font-weight: 800; }
+.stat-label { margin-top: 4rpx; color: #7a8699; font-size: 22rpx; }
+.stat-divider { width: 2rpx; height: 52rpx; background: #edf0f4; }
+.section-row { display: flex; align-items: center; justify-content: space-between; margin-top: 6rpx; }
+.small { font-size: 22rpx; }
+.empty { text-align: center; padding: 54rpx 30rpx; }
+.empty-mark { font-size: 58rpx; color: #b9c2cf; }
+.empty-title { margin: 12rpx 0 8rpx; font-size: 28rpx; font-weight: 700; }
+.booking-card { margin-bottom: 20rpx; }
+.booking-head { display: flex; justify-content: space-between; align-items: center; }
+.room { font-size: 31rpx; font-weight: 800; }
+.status { padding: 8rpx 14rpx; border-radius: 999rpx; font-size: 21rpx; }
+.status-pending { background: #fff5dd; color: #9a6500; }
+.status-success { background: #e9f8ef; color: #16814a; }
+.status-active { background: #e8f1ff; color: #1557b0; }
+.status-warning { background: #fff0e8; color: #b54708; }
+.status-danger { background: #fff0f0; color: #c93636; }
+.status-done, .status-muted { background: #eef2f6; color: #667085; }
+.booking-purpose { margin-top: 18rpx; font-size: 28rpx; line-height: 1.55; }
+.booking-meta { margin-top: 12rpx; color: #667085; font-size: 23rpx; }
+.booking-reason { margin-top: 14rpx; padding: 14rpx 16rpx; border-radius: 14rpx; background: #f7f8fa; color: #667085; font-size: 22rpx; line-height: 1.5; }
+.action-hint { margin-top: 18rpx; color: #1f6feb; font-size: 24rpx; font-weight: 700; }
+.warning-hint { color: #b54708; }
+
+.notice-entry { margin-top: 20rpx; display: flex; align-items: center; }
+.notice-icon { width: 56rpx; height: 56rpx; display: flex; align-items: center; justify-content: center; border-radius: 18rpx; background: #f1f4f8; color: #1f6feb; font-size: 28rpx; }
+.notice-body { flex: 1; margin-left: 18rpx; }
+.notice-title { font-size: 27rpx; font-weight: 700; }
+.notice-note { margin-top: 4rpx; font-size: 21rpx; }
+.notice-arrow { color: #98a2b3; font-size: 40rpx; }

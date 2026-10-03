@@ -1,0 +1,37 @@
+<view class="login-page">
+  <view class="brand">
+    <view class="brand-mark">笃</view>
+    <view class="brand-title">笃学书院</view>
+    <view class="brand-subtitle">社区空间预约管理</view>
+  </view>
+
+  <view class="login-card" wx:if="{{!changeMode}}">
+    <view class="card-title">账号登录</view>
+    <view class="card-note">系统采用后台白名单，无需自行注册</view>
+    <view class="field">
+      <view class="label">学号 / 工号</view>
+      <input class="input" value="{{loginId}}" maxlength="64" placeholder="请输入学号或工号" bindinput="onLoginIdInput" />
+    </view>
+    <view class="field">
+      <view class="label">密码</view>
+      <input class="input" value="{{password}}" password maxlength="128" placeholder="请输入密码" bindinput="onPasswordInput" confirm-type="done" bindconfirm="submitLogin" />
+    </view>
+    <button class="btn-primary login-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitLogin">登录</button>
+  </view>
+
+  <view class="login-card" wx:else>
+    <view class="card-title">首次登录 · 修改密码</view>
+    <view class="card-note">{{displayName}}，为保护账号安全，请先设置新的登录密码。</view>
+    <view class="field">
+      <view class="label">新密码</view>
+      <input class="input" value="{{newPassword}}" password maxlength="128" placeholder="至少 8 位" bindinput="onNewPasswordInput" />
+    </view>
+    <view class="field">
+      <view class="label">确认新密码</view>
+      <input class="input" value="{{confirmPassword}}" password maxlength="128" placeholder="再次输入新密码" bindinput="onConfirmPasswordInput" confirm-type="done" bindconfirm="submitPasswordChange" />
+    </view>
+    <button class="btn-primary login-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitPasswordChange">保存并进入系统</button>
+  </view>
+
+  <view class="security-note">账号、预约与门禁操作均由后端鉴权。</view>
+</view>

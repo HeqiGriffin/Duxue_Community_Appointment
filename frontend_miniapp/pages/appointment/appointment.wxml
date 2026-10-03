@@ -1,0 +1,53 @@
+<view class="container appointment-page">
+  <view class="intro card">
+    <view class="intro-badge">AI 智能分配</view>
+    <view class="intro-title">告诉系统你想做什么</view>
+    <view class="intro-note">无需选择固定场景。系统会根据用途、人数与时间自动判断并分配适合的房间。</view>
+  </view>
+
+  <view class="section-title">预约时间</view>
+  <view class="card form-card">
+    <view class="form-row">
+      <view class="label">日期</view>
+      <picker mode="date" value="{{date}}" start="{{minDate}}" end="{{maxDate}}" bindchange="onDateChange">
+        <view class="picker-box">{{date}}</view>
+      </picker>
+    </view>
+    <view class="two-cols">
+      <view class="col">
+        <view class="label">开始</view>
+        <picker mode="selector" range="{{slots}}" value="{{startIndex}}" bindchange="onStartChange">
+          <view class="picker-box">{{startText}}</view>
+        </picker>
+      </view>
+      <view class="col">
+        <view class="label">结束</view>
+        <picker mode="selector" range="{{slots}}" value="{{endIndex}}" bindchange="onEndChange">
+          <view class="picker-box">{{endText}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="duration" wx:if="{{durationText}}">本次预约：{{durationText}} · 30 分钟粒度</view>
+  </view>
+
+  <view class="section-title">使用信息</view>
+  <view class="card form-card">
+    <view class="label">人数</view>
+    <input class="input" type="number" value="{{peopleCount}}" maxlength="3" placeholder="请输入实际人数" bindinput="onPeopleInput" />
+    <view class="label purpose-label">具体用途</view>
+    <textarea class="textarea" value="{{purpose}}" maxlength="1000" auto-height="false" placeholder="请尽量具体，例如：期末考试周复习，需要安静座位" bindinput="onPurposeInput" />
+    <view class="counter">{{purposeLength}} / 1000</view>
+
+    <view class="example-title">可以这样写</view>
+    <view class="examples">
+      <view class="example" wx:for="{{examples}}" wx:key="*this" data-text="{{item}}" bindtap="useExample">{{item}}</view>
+    </view>
+  </view>
+
+  <view class="notice">
+    <view class="notice-title">提交后会发生什么？</view>
+    <view>AI 会进行秒批、打回或转人工审核；只有审批真正通过时才锁定房间。动态时长限制由后端根据用途判断。</view>
+  </view>
+
+  <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">提交预约申请</button>
+</view>

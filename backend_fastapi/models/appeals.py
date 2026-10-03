@@ -1,18 +1,45 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum, DateTime
-from sqlalchemy.sql import func
+"""冻结账号的线上申诉工单模型。"""
+from __future__ import annotations
+
 import enum
-from .users import Base
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from config import Base
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 class AppealStatus(str, enum.Enum):
-    pending = "pending"   # 待审核
-    resolved = "resolved" # 已批准解封
-    rejected = "rejected" # 驳回申诉，维持冻结
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
 
 class Appeal(Base):
     __tablename__ = "appeals"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    reason = Column(String, nullable=False)              # 迟交/未交打扫照片的原因说明
-    submit_time = Column(DateTime, default=func.now())
-    status = Column(Enum(AppealStatus), default=AppealStatus.pending)
-    admin_reply = Column(String, nullable=True)          # 管理员的处理批注意见
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="SET NULL"), nullable=True)
+
+    statement: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[AppealStatus] = mapped_column(
+        Enum(AppealStatus, native_enum=False, length=16),
+        default=AppealStatus.PENDING,
+        nullable=False,
+        index=True,
+    )
+
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )

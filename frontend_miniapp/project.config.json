@@ -1,0 +1,14 @@
+{
+  "description": "笃学书院社区空间预约管理小程序",
+  "compileType": "miniprogram",
+  "libVersion": "trial",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false
+  },
+  "appid": "touristappid",
+  "projectname": "Duxue_Community_Appointment"
+}

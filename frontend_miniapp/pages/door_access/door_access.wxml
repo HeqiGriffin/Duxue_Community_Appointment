@@ -1,0 +1,39 @@
+<view class="container door-page">
+  <view class="card booking-summary" wx:if="{{booking}}">
+    <view class="summary-head">
+      <view class="room-code">{{booking.room_code || '尚未分配房间'}}</view>
+      <view class="badge">{{statusText}}</view>
+    </view>
+    <view class="purpose">{{booking.purpose}}</view>
+    <view class="muted meta">{{timeText}}</view>
+  </view>
+
+  <view class="card qr-card" wx:if="{{booking}}">
+    <view class="step-tag">01 · 到场</view>
+    <view class="card-title">签到并获取动态二维码</view>
+    <view class="card-note">仅在预约有效时段内可获取。二维码由后端实时向 i大工代理取得，不会长期保存在小程序。</view>
+
+    <view class="qr-wrap" wx:if="{{qrPath}}">
+      <image class="qr-image" src="{{qrPath}}" mode="aspectFit" show-menu-by-longpress="{{false}}"></image>
+      <view class="muted fetched">获取时间：{{qrFetchedAt}}</view>
+    </view>
+    <view class="qr-placeholder" wx:else>
+      <view class="placeholder-icon">▦</view>
+      <view>{{canOpen ? '点击下方按钮获取门禁码' : '当前不在可签到时段'}}</view>
+    </view>
+
+    <button class="btn-primary" wx:if="{{canOpen}}" loading="{{opening}}" disabled="{{opening}}" bindtap="openDoor">{{qrPath ? '刷新动态二维码' : '签到并获取二维码'}}</button>
+    <view class="not-ready" wx:else>预约开始后才可签到开门</view>
+  </view>
+
+  <view class="card cleanup-card" wx:if="{{booking}}">
+    <view class="step-tag orange">02 · 离场</view>
+    <view class="card-title">现场清理并实拍上传</view>
+    <view class="card-note">预约结束后 30 分钟内完成。此入口只允许调用实时相机，不提供相册选择。</view>
+    <button class="btn-secondary cleanup-btn" wx:if="{{canCleanup}}" loading="{{uploading}}" disabled="{{uploading}}" bindtap="takeAndUpload">打开相机并提交现场照片</button>
+    <view class="not-ready" wx:elif="{{booking.status === 'completed'}}">离场照片已提交</view>
+    <view class="not-ready" wx:else>预约结束后开放离场实拍</view>
+  </view>
+
+  <view class="rule-note">超时未完成离场实拍，后端会自动冻结预约与签到权限；被冻结后可从首页进入线上申诉。</view>
+</view>

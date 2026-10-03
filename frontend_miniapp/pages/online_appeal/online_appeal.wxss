@@ -1,0 +1,22 @@
+.appeal-page { padding-bottom: 60rpx; }
+.status-card { display: flex; flex-direction: column; align-items: flex-start; }
+.status-title { color: #667085; font-size: 24rpx; }
+.account-status { margin-top: 10rpx; font-size: 42rpx; font-weight: 800; }
+.account-status.normal { color: #16814a; }
+.account-status.frozen { color: #c93636; }
+.status-note { margin-top: 10rpx; font-size: 23rpx; line-height: 1.6; }
+.label { margin-bottom: 12rpx; color: #344054; font-size: 25rpx; font-weight: 700; }
+.statement-label { margin-top: 26rpx; }
+.counter { margin-top: 8rpx; text-align: right; color: #98a2b3; font-size: 21rpx; }
+.submit { margin-top: 24rpx; }
+.empty { text-align: center; color: #98a2b3; }
+.appeal-item { margin-bottom: 20rpx; }
+.appeal-head { display: flex; justify-content: space-between; align-items: center; }
+.appeal-id { font-size: 27rpx; font-weight: 700; }
+.status-pill { padding: 7rpx 14rpx; border-radius: 999rpx; font-size: 21rpx; }
+.status-pending { background: #fff5dd; color: #9a6500; }
+.status-approved { background: #e9f8ef; color: #16814a; }
+.status-rejected { background: #fff0f0; color: #c93636; }
+.statement { margin-top: 18rpx; font-size: 26rpx; line-height: 1.6; }
+.time { margin-top: 10rpx; font-size: 21rpx; }
+.review { margin-top: 14rpx; padding: 14rpx 16rpx; border-radius: 14rpx; background: #f4f6f8; color: #475467; font-size: 23rpx; line-height: 1.55; }

@@ -1,0 +1,19 @@
+.door-page { padding-bottom: 60rpx; }
+.booking-summary { margin-bottom: 22rpx; }
+.summary-head { display: flex; justify-content: space-between; align-items: center; }
+.room-code { font-size: 38rpx; font-weight: 800; }
+.purpose { margin-top: 18rpx; font-size: 28rpx; line-height: 1.55; }
+.meta { margin-top: 10rpx; font-size: 23rpx; }
+.qr-card, .cleanup-card { margin-bottom: 22rpx; }
+.step-tag { display: inline-flex; padding: 7rpx 15rpx; border-radius: 999rpx; background: #e9f2ff; color: #1557b0; font-size: 21rpx; font-weight: 700; }
+.orange { background: #fff1e8; color: #b54708; }
+.card-title { margin-top: 16rpx; font-size: 32rpx; font-weight: 800; }
+.card-note { margin-top: 10rpx; color: #667085; font-size: 23rpx; line-height: 1.6; }
+.qr-wrap { margin: 30rpx 0; text-align: center; }
+.qr-image { width: 430rpx; height: 430rpx; border-radius: 20rpx; background: #fff; }
+.fetched { margin-top: 12rpx; font-size: 21rpx; }
+.qr-placeholder { height: 360rpx; margin: 28rpx 0; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2rpx dashed #d9e0e8; border-radius: 24rpx; color: #98a2b3; font-size: 24rpx; }
+.placeholder-icon { margin-bottom: 14rpx; font-size: 84rpx; color: #c0c9d5; }
+.not-ready { margin-top: 22rpx; padding: 20rpx; border-radius: 18rpx; background: #f4f6f8; text-align: center; color: #7a8699; font-size: 24rpx; }
+.cleanup-btn { margin-top: 28rpx; }
+.rule-note { padding: 8rpx 6rpx 30rpx; color: #7a8699; font-size: 22rpx; line-height: 1.65; }

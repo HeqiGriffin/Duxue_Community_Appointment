@@ -1,0 +1,75 @@
+<view class="container home-page">
+  <view class="hero">
+    <view class="hero-top">
+      <view>
+        <view class="hello">{{greeting}}，{{session.name || session.loginId}}</view>
+        <view class="identity">{{session.role === 'admin' ? '管理员' : '学生'}} · {{session.loginId}}</view>
+      </view>
+      <view class="logout" bindtap="logout">退出</view>
+    </view>
+    <view class="mode-row">
+      <text class="mode-pill">{{session.mode === 'admin' ? '管理模式' : (session.mode === 'duty' ? '值班模式' : '常规模式')}}</text>
+      <text class="mode-state {{frozen ? 'frozen-text' : ''}}">{{frozen ? '账号已冻结' : '账号正常'}}</text>
+    </view>
+  </view>
+
+  <view class="freeze-banner" wx:if="{{frozen}}">
+    <view class="freeze-icon">!</view>
+    <view class="freeze-content">
+      <view class="freeze-title">预约与签到权限已冻结</view>
+      <view class="freeze-note">你仍可登录查看记录，并通过线上申诉申请恢复权限。</view>
+    </view>
+    <view class="freeze-action" bindtap="goAppeal">去申诉</view>
+  </view>
+
+  <view class="quick-grid">
+    <view class="quick-card primary-card" bindtap="goAppointment">
+      <view class="quick-icon">＋</view>
+      <view class="quick-title">发起预约</view>
+      <view class="quick-note">自然语言填写用途</view>
+    </view>
+    <view class="quick-card" bindtap="goDoorList">
+      <view class="quick-icon qr-icon">▦</view>
+      <view class="quick-title">签到 / 离场</view>
+      <view class="quick-note">动态二维码与实拍</view>
+    </view>
+  </view>
+
+  <view class="stats card">
+    <view class="stat-item"><view class="stat-num">{{stats.pending}}</view><view class="stat-label">审核中</view></view>
+    <view class="stat-divider"></view>
+    <view class="stat-item"><view class="stat-num">{{stats.upcoming}}</view><view class="stat-label">待使用</view></view>
+    <view class="stat-divider"></view>
+    <view class="stat-item"><view class="stat-num">{{stats.cleanup}}</view><view class="stat-label">待收尾</view></view>
+  </view>
+
+  <view class="notice-entry card" bindtap="showSystemNotice">
+    <view class="notice-icon">◉</view>
+    <view class="notice-body"><view class="notice-title">系统通知</view><view class="muted notice-note">查看审核、使用与收尾提醒说明</view></view>
+    <view class="notice-arrow">›</view>
+  </view>
+
+  <view class="section-row">
+    <view class="section-title">我的预约</view>
+    <view class="muted small">下拉可刷新</view>
+  </view>
+
+  <view class="empty card" wx:if="{{!loading && bookings.length === 0}}">
+    <view class="empty-mark">○</view>
+    <view class="empty-title">还没有预约记录</view>
+    <view class="muted">点击“发起预约”开始使用社区空间。</view>
+  </view>
+
+  <view class="booking-card card" wx:for="{{bookings}}" wx:key="id" data-id="{{item.id}}" bindtap="openBooking">
+    <view class="booking-head">
+      <view class="room">{{item.roomText}}</view>
+      <view class="status status-{{item.statusClass}}">{{item.statusText}}</view>
+    </view>
+    <view class="booking-purpose">{{item.purpose}}</view>
+    <view class="booking-meta">{{item.timeText}} · {{item.people_count}} 人</view>
+    <view class="booking-reason" wx:if="{{item.rejection_reason}}">原因：{{item.rejection_reason}}</view>
+    <view class="booking-reason" wx:elif="{{item.ai_guidance && item.status === 'rejected'}}">建议：{{item.ai_guidance}}</view>
+    <view class="action-hint" wx:if="{{item.canDoor}}">当前可签到开门 →</view>
+    <view class="action-hint warning-hint" wx:elif="{{item.canUploadCleanup}}">请完成离场实拍 →</view>
+  </view>
+</view>

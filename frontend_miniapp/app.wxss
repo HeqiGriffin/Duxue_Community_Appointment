@@ -1,0 +1,104 @@
+page {
+  min-height: 100%;
+  background: #f6f8fb;
+  color: #182230;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+.container {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 32rpx;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 28rpx;
+  padding: 30rpx;
+  box-shadow: 0 10rpx 30rpx rgba(23, 43, 77, 0.06);
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 92rpx;
+  border-radius: 24rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 92rpx;
+  padding: 0 28rpx;
+}
+
+.btn-primary {
+  background: #1f6feb;
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #e9f2ff;
+  color: #1557b0;
+}
+
+.btn-danger {
+  background: #fff0f0;
+  color: #c93636;
+}
+
+.btn-ghost {
+  background: #f1f4f8;
+  color: #344054;
+}
+
+button::after {
+  border: none;
+}
+
+.input,
+.textarea,
+.picker-box {
+  box-sizing: border-box;
+  width: 100%;
+  border: 2rpx solid #e4e9f0;
+  border-radius: 20rpx;
+  background: #fbfcfe;
+  font-size: 30rpx;
+  color: #182230;
+}
+
+.input,
+.picker-box {
+  height: 92rpx;
+  padding: 0 24rpx;
+  line-height: 92rpx;
+}
+
+.textarea {
+  min-height: 220rpx;
+  padding: 22rpx 24rpx;
+  line-height: 1.6;
+}
+
+.section-title {
+  margin: 34rpx 0 18rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.muted {
+  color: #7a8699;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #eef3f8;
+  color: #52606f;
+  font-size: 22rpx;
+  line-height: 1.2;
+}
