@@ -121,7 +121,7 @@ function request(options) {
     // ========== 真机：AnyService callContainer 分支 ==========
     if(isUseCloudContainer()){
       const app = getApp()
-      const fullPath = url + toQuery(query)
+      const fullPath = '/api' + url + toQuery(query)
       console.log("====AnyService请求信息====")
       console.log("envId:",app.globalData.cloudEnvId)
       console.log("serviceName:",app.globalData.anyServiceName)
