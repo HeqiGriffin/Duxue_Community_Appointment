@@ -90,10 +90,13 @@ function redirectLogin() {
   }, 100)
 }
 
-// 判断是否真机环境，走AnyService网关
+// 判断是否真机环境，走AnyService网关，增加打印日志
 function isUseCloudContainer() {
-  // 真机 = 使用云网关；模拟器继续原生wx.request本地调试
-  return wx.getSystemInfoSync().platform !== 'devtools'
+  const sysInfo = wx.getSystemInfoSync()
+  console.log("platform = ", sysInfo.platform)
+  const flag = sysInfo.platform !== 'devtools'
+  console.log("是否走AnyService：", flag)
+  return flag
 }
 
 function request(options) {
@@ -118,9 +121,13 @@ function request(options) {
     // ========== 真机：AnyService callContainer 分支 ==========
     if(isUseCloudContainer()){
       const app = getApp()
-      // 拼接query参数
       const fullPath = url + toQuery(query)
-      wx.cloud.callContainer({
+      console.log("====AnyService请求信息====")
+      console.log("envId:",app.globalData.cloudEnvId)
+      console.log("serviceName:",app.globalData.anyServiceName)
+      console.log("path:",fullPath)
+
+      const callPromise = wx.cloud.callContainer({
         path: fullPath,
         header: {
           "X-WX-SERVICE": "tcbanyservice",
@@ -130,8 +137,17 @@ function request(options) {
         method,
         data,
         timeout:20000
-      }).then(res=>{
-        // callContainer成功，模拟wx.request的res结构，复用原有逻辑
+      })
+      // 20s超时兜底
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(()=>{
+          reject(new Error("请求超时，请检查网络或服务配置"))
+        }, 20000)
+      })
+
+      Promise.race([callPromise, timeoutPromise])
+      .then(res=>{
+        console.log("callContainer成功返回：",res)
         const fakeRes = {
           statusCode: res.statusCode || 200,
           data: res.data
@@ -145,11 +161,14 @@ function request(options) {
         error.data = fakeRes.data
         if (fakeRes.statusCode === 401 && auth) redirectLogin()
         reject(error)
-      }).catch(err=>{
-        const error = new Error(err.errMsg || '网络连接失败')
+      })
+      .catch(err=>{
+        console.error("callContainer捕获异常：",err)
+        const error = new Error(err.errMsg || err.message || '网络连接失败')
         error.original = err
         reject(error)
-      }).finally(()=>{
+      })
+      .finally(()=>{
         if (loading) wx.hideLoading()
       })
       return
@@ -185,9 +204,7 @@ function request(options) {
   })
 }
 
-// ⚠️ 注意：wx.cloud.callContainer **不支持文件上传**
-// upload函数保留原wx.uploadFile，仅用于模拟器本地调试
-// 【真机上传图片】需要单独处理，后面再说
+// upload函数：仅模拟器本地可用，真机上传暂不支持
 function upload(options) {
   const { url, filePath, name = 'photo', formData = {}, auth = true, loading = true, headers = {} } = options
   const session = getSession()

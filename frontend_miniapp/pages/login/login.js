@@ -1,5 +1,4 @@
 const { request, saveSession, getSession } = require('../../utils/request')
-
 Page({
   data: {
     loginId: '',
@@ -11,19 +10,16 @@ Page({
     confirmPassword: '',
     displayName: ''
   },
-
   onLoad() {
     const session = getSession()
     if (session && session.accessToken && !session.mustChangePassword) {
       wx.reLaunch({ url: '/pages/home/home' })
     }
   },
-
   onLoginIdInput(e) { this.setData({ loginId: e.detail.value.trim() }) },
   onPasswordInput(e) { this.setData({ password: e.detail.value }) },
   onNewPasswordInput(e) { this.setData({ newPassword: e.detail.value }) },
   onConfirmPasswordInput(e) { this.setData({ confirmPassword: e.detail.value }) },
-
   async submitLogin() {
     const { loginId, password, submitting } = this.data
     if (submitting) return
@@ -56,7 +52,6 @@ Page({
       this.setData({ submitting: false })
     }
   },
-
   async submitPasswordChange() {
     const { oldPassword, newPassword, confirmPassword, submitting } = this.data
     if (submitting) return
