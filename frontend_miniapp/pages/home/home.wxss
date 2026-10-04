@@ -53,3 +53,5 @@
 .notice-title { font-size: 27rpx; font-weight: 700; }
 .notice-note { margin-top: 4rpx; font-size: 21rpx; }
 .notice-arrow { color: #98a2b3; font-size: 40rpx; }
+
+.appeal-link { margin-top:14rpx; padding-top:14rpx; border-top:2rpx solid #f0f2f5; color:#1557b0; font-size:23rpx; font-weight:700; }

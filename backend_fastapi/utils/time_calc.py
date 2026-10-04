@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 APP_TZ = ZoneInfo("Asia/Shanghai")
 SLOT_MINUTES = 30
 FALLBACK_HOUR = 23
+CLEANUP_EARLY_MINUTES = 30
 CLEANUP_GRACE_MINUTES = 30
 
 
@@ -35,6 +36,10 @@ def duration_minutes(start: datetime, end: datetime) -> int:
     validate_booking_range(start, end)
     delta = ensure_local(end) - ensure_local(start)
     return int(delta.total_seconds() // 60)
+
+
+def cleanup_window_start(end: datetime) -> datetime:
+    return ensure_local(end) - timedelta(minutes=CLEANUP_EARLY_MINUTES)
 
 
 def cleanup_deadline(end: datetime) -> datetime:

@@ -88,16 +88,17 @@ Page({
     const startMs = toCampusMs(item.start_time)
     const endMs = toCampusMs(item.end_time)
     const canCheckin = item.status === 'approved' && now >= startMs - 60 * 60 * 1000 && now <= startMs + 60 * 60 * 1000
-    const canUploadCleanup = ['active', 'awaiting_cleanup'].includes(item.status) && now >= endMs
+    const canUploadCleanup = ['active', 'awaiting_cleanup'].includes(item.status) && now >= endMs - 30 * 60 * 1000 && now <= endMs + 30 * 60 * 1000
     return {
       ...item,
       statusText: meta[0],
       statusClass: meta[1],
       timeText: `${campusTime(item.start_time)} - ${campusTime(item.end_time).split(' ').pop()}`,
-      roomText: item.room_code || '审核通过后分配',
+      roomText: item.room_code || item.requested_room_code || '待分配',
       canCheckin,
       canUploadCleanup,
-      showAction: canCheckin || canUploadCleanup
+      canAppeal: item.status === 'rejected',
+      showAction: canCheckin || canUploadCleanup || item.status === 'rejected'
     }
   },
 
@@ -124,6 +125,12 @@ Page({
   },
 
   goAppeal() { wx.navigateTo({ url: '/pages/online_appeal/online_appeal' }) },
+
+  goBookingAppeal(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    if (!id) return
+    wx.navigateTo({ url: `/pages/online_appeal/online_appeal?bookingId=${id}` })
+  },
 
   showSystemNotice() {
     wx.showModal({

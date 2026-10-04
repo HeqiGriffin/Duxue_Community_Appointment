@@ -7,13 +7,13 @@ from typing import Annotated, Literal
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from config import get_db, settings
 from models.users import User, UserRole, UserStatus
-from utils.security import create_access_token, decode_access_token, hash_password, secure_equals, verify_password
+from utils.security import create_access_token, decode_access_token, hash_password, secure_equals, validate_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer(auto_error=False)
@@ -21,7 +21,7 @@ bearer = HTTPBearer(auto_error=False)
 
 class LoginRequest(BaseModel):
     login_id: str = Field(min_length=1, max_length=64)
-    password: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=1)
 
 
 class LoginResponse(BaseModel):
@@ -60,8 +60,17 @@ class AdminUserStatusRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(min_length=1, max_length=128)
-    new_password: str = Field(min_length=8, max_length=128)
+    old_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=2)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, value: str) -> str:
+        try:
+            validate_password(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        return value
 
 
 class MeResponse(BaseModel):

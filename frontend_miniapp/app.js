@@ -5,7 +5,7 @@ wx.cloud.init({
 
 App({
   globalData: {
-    // 微信开发者工具本地联调默认地址；真机/生产必须改为已备案 HTTPS 业务域名。
+    // 微信开发者工具使用本地联调地址；真机请求由 utils/request.js 通过 CloudBase AnyService 转发。
     apiBaseUrl: 'http://127.0.0.1:8000/api',
     campusTimezone: '+08:00',
     session: null,

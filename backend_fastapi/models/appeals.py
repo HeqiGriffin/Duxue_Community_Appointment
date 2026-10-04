@@ -20,6 +20,11 @@ class AppealStatus(str, enum.Enum):
     REJECTED = "rejected"
 
 
+class AppealType(str, enum.Enum):
+    ACCOUNT = "account"
+    BOOKING_REVIEW = "booking_review"
+
+
 class Appeal(Base):
     __tablename__ = "appeals"
 
@@ -27,6 +32,12 @@ class Appeal(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id", ondelete="SET NULL"), nullable=True)
 
+    appeal_type: Mapped[AppealType] = mapped_column(
+        Enum(AppealType, native_enum=False, length=32),
+        default=AppealType.ACCOUNT,
+        nullable=False,
+        index=True,
+    )
     statement: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[AppealStatus] = mapped_column(
         Enum(AppealStatus, native_enum=False, length=16),

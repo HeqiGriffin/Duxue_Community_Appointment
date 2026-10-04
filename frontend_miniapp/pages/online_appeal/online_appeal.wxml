@@ -1,27 +1,32 @@
 <view class="container appeal-page">
-  <view class="card status-card">
+  <view class="card status-card" wx:if="{{bookingAppealMode}}">
+    <view class="status-title">预约人工复核</view>
+    <view class="account-status normal">#{{bookingId}}</view>
+    <view class="status-note" wx:if="{{bookingTarget}}">{{bookingTarget.purpose}}</view>
+    <view class="muted status-note" wx:if="{{bookingTarget}}">当前状态：{{bookingTarget.status === 'rejected' ? '已驳回，可申请人工复核' : '已进入后续处理流程'}}</view>
+  </view>
+
+  <view class="card status-card" wx:else>
     <view class="status-title">当前账号状态</view>
     <view class="account-status {{frozen ? 'frozen' : 'normal'}}">{{frozen ? '已冻结' : '正常'}}</view>
     <view class="muted status-note" wx:if="{{frozen}}">请如实说明情况。管理员审核通过后，系统会恢复预约与签到权限。</view>
     <view class="muted status-note" wx:else>当前无需提交解封申诉。</view>
   </view>
 
-  <view class="section-title">提交情况说明</view>
-  <view class="card" style="opacity: {{frozen ? 1 : 0.55}}">
-    <view class="label">关联预约编号（可选）</view>
-    <input class="input" type="number" disabled="{{!frozen}}" value="{{bookingId}}" placeholder="例如 1024" bindinput="onBookingInput" />
+  <view class="section-title">{{bookingAppealMode ? '提交人工复核说明' : '提交情况说明'}}</view>
+  <view class="card" style="opacity: {{canSubmit ? 1 : 0.55}}">
     <view class="label statement-label">情况说明</view>
-    <textarea class="textarea" disabled="{{!frozen}}" value="{{statement}}" maxlength="4000" placeholder="请说明被冻结相关情况、现场处理情况以及申请解封的理由，至少 10 个字。" bindinput="onStatementInput" />
+    <textarea class="textarea" disabled="{{!canSubmit}}" value="{{statement}}" maxlength="4000" placeholder="{{bookingAppealMode ? '请说明为什么认为本次申请应转人工复核，至少 10 个字。' : '请说明被冻结相关情况、现场处理情况以及申请解封的理由，至少 10 个字。'}}" bindinput="onStatementInput" />
     <view class="counter">{{statementLength}} / 4000</view>
-    <button class="btn-primary submit" disabled="{{!frozen || submitting}}" loading="{{submitting}}" bindtap="submit">提交解封申诉</button>
+    <button class="btn-primary submit" disabled="{{!canSubmit || submitting}}" loading="{{submitting}}" bindtap="submit">{{bookingAppealMode ? '转人工复核' : '提交解封申诉'}}</button>
   </view>
 
   <view class="section-title">历史申诉</view>
   <view class="card empty" wx:if="{{appeals.length === 0}}">暂无申诉记录</view>
   <view class="card appeal-item" wx:for="{{appeals}}" wx:key="id">
-    <view class="appeal-head"><view class="appeal-id">申诉 #{{item.id}}</view><view class="status-pill status-{{item.status}}">{{item.statusText}}</view></view>
+    <view class="appeal-head"><view class="appeal-id">{{item.typeText}} · #{{item.id}}</view><view class="status-pill status-{{item.status}}">{{item.statusText}}</view></view>
     <view class="statement">{{item.statement}}</view>
-    <view class="muted time">{{item.createdText}}</view>
-    <view class="review" wx:if="{{item.review_comment}}">处理意见：{{item.review_comment}}</view>
+    <view class="muted time">{{item.createdText}}<text wx:if="{{item.booking_id}}"> · 预约 #{{item.booking_id}}</text></view>
+    <view class="review" wx:if="{{item.review_comment}}">管理员意见：{{item.review_comment}}</view>
   </view>
 </view>

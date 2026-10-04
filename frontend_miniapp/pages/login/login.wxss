@@ -10,3 +10,5 @@
 .label { margin-bottom: 12rpx; color: #344054; font-size: 26rpx; font-weight: 600; }
 .login-button { margin-top: 36rpx; }
 .security-note { margin-top: 30rpx; text-align: center; color: #98a2b3; font-size: 22rpx; }
+
+.error-banner { margin-top:20rpx; padding:18rpx 20rpx; border-radius:16rpx; background:#fff0f0; color:#c93636; font-size:24rpx; line-height:1.5; }

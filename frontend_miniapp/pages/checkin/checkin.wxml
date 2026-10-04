@@ -1,7 +1,7 @@
 <view class="container checkin-page">
   <view class="card booking-summary" wx:if="{{booking}}">
     <view class="summary-head">
-      <view class="room-code">{{booking.room_code || '尚未分配房间'}}</view>
+      <view class="room-code">{{booking.room_code || booking.requested_room_code || '尚未分配房间'}}</view>
       <view class="badge">{{statusText}}</view>
     </view>
     <view class="purpose">{{booking.purpose}}</view>
@@ -28,11 +28,17 @@
   <view class="card cleanup-card" wx:if="{{booking}}">
     <view class="step-tag orange">02 · 离场</view>
     <view class="card-title">现场清理并实拍上传</view>
-    <view class="card-note">当前规则为预约结束后 30 分钟内完成。此入口只允许调用实时相机，不提供相册选择。</view>
-    <button class="btn-secondary cleanup-btn" wx:if="{{canCleanup}}" loading="{{uploading}}" disabled="{{uploading}}" bindtap="takeAndUpload">打开相机并提交现场照片</button>
-    <view class="not-ready" wx:elif="{{booking.status === 'completed'}}">离场照片已提交</view>
-    <view class="not-ready" wx:else>预约结束后开放离场实拍</view>
+    <view class="card-note">离场实拍窗口为预约结束前 30 分钟至结束后 30 分钟，总计 1 小时。入口只允许调用实时相机，不提供相册选择。</view>
+    <button class="btn-secondary cleanup-btn" wx:if="{{canCleanup && !booking.has_cleanup_photo}}" loading="{{uploading}}" disabled="{{uploading}}" bindtap="takeAndUpload">打开相机并提交现场照片</button>
+    <view class="not-ready" wx:else>{{cleanupHint}}</view>
+
+    <view class="photo-section" wx:if="{{booking.has_cleanup_photo}}">
+      <view class="photo-title">我提交的离场照片</view>
+      <view class="photo-loading" wx:if="{{photoLoading}}">正在读取照片…</view>
+      <image wx:elif="{{cleanupPhotoPath}}" class="cleanup-photo" src="{{cleanupPhotoPath}}" mode="aspectFill" bindtap="previewCleanupPhoto" />
+      <view class="photo-note" wx:if="{{cleanupPhotoPath}}">点击照片可放大查看</view>
+    </view>
   </view>
 
-  <view class="rule-note">超时未完成离场实拍，后端会自动冻结预约与签到权限；被冻结后可从首页进入线上申诉。</view>
+  <view class="rule-note">超过预约结束后 30 分钟仍未完成离场实拍，后端会自动冻结预约与签到权限；被冻结后可从首页进入线上申诉。</view>
 </view>

@@ -18,6 +18,7 @@ from core.scheduler import start_scheduler, stop_scheduler
 from models.appeals import Appeal  # noqa: F401 - 导入以注册 SQLAlchemy metadata
 from models.bookings import Booking, BookingSlotLock  # noqa: F401
 from models.users import User, UserRole
+from utils.schema import ensure_schema
 from utils.security import hash_password
 
 
@@ -45,6 +46,7 @@ def bootstrap_admin() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_schema(engine)
     bootstrap_admin()
     start_scheduler()
     try:
@@ -55,7 +57,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
@@ -78,4 +80,4 @@ app.include_router(duty_router, prefix=settings.api_prefix)
 
 @app.get("/health", tags=["system"])
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "backend_fastapi", "version": "0.4.0"}
+    return {"status": "ok", "service": "backend_fastapi", "version": "0.5.0"}

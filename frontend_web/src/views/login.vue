@@ -29,6 +29,7 @@ async function login() {
 }
 
 async function changePassword() {
+  if (!/[A-Za-z]/.test(newPassword.value) || !/\d/.test(newPassword.value)) { error.value = '新密码必须同时包含字母和数字'; return }
   loading.value = true; error.value = ''
   try {
     const data = await jsonApi('/auth/change-password', { method: 'POST', body: { old_password: oldPassword.value, new_password: newPassword.value } })
@@ -51,8 +52,8 @@ async function changePassword() {
       <template v-else>
         <div class="success">首次登录必须修改密码后才能继续。</div>
         <div class="field"><label class="label">原密码</label><input v-model="oldPassword" class="input" type="password" /></div>
-        <div class="field"><label class="label">新密码（至少 8 位）</label><input v-model="newPassword" class="input" type="password" /></div>
-        <button class="btn btn-primary" :disabled="loading || newPassword.length < 8" @click="changePassword">修改密码并进入系统</button>
+        <div class="field"><label class="label">新密码（至少包含字母和数字）</label><input v-model="newPassword" class="input" type="password" /></div>
+        <button class="btn btn-primary" :disabled="loading || !newPassword" @click="changePassword">修改密码并进入系统</button>
       </template>
     </div>
   </div>

@@ -17,3 +17,8 @@
 .not-ready { margin-top: 22rpx; padding: 20rpx; border-radius: 18rpx; background: #f4f6f8; text-align: center; color: #7a8699; font-size: 24rpx; }
 .cleanup-btn { margin-top: 28rpx; }
 .rule-note { padding: 8rpx 6rpx 30rpx; color: #7a8699; font-size: 22rpx; line-height: 1.65; }
+.photo-section { margin-top:26rpx; padding-top:24rpx; border-top:2rpx solid #eef1f5; }
+.photo-title { font-size:25rpx; font-weight:700; color:#344054; }
+.photo-loading { margin-top:16rpx; color:#667085; font-size:23rpx; }
+.cleanup-photo { margin-top:16rpx; width:100%; height:360rpx; border-radius:18rpx; background:#f2f4f7; }
+.photo-note { margin-top:8rpx; color:#98a2b3; font-size:21rpx; text-align:center; }

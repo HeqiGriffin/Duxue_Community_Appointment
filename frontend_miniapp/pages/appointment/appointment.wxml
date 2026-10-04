@@ -1,41 +1,58 @@
 <view class="container appointment-page">
   <view class="intro card">
-    <view class="intro-badge">AI 智能分配</view>
-    <view class="intro-title">告诉系统你想做什么</view>
-    <view class="intro-note">无需选择固定场景。系统会根据用途、人数与时间自动判断并分配适合的房间。</view>
+    <view class="intro-badge">AI 智能审核</view>
+    <view class="intro-title">先选时间，再选空闲房间</view>
+    <view class="intro-note">每个按钮代表 30 分钟。请选择连续时段，系统会立即显示该时段仍空闲的房间。</view>
   </view>
 
-  <view class="section-title">预约时间</view>
+  <view class="section-title">1 · 预约日期</view>
   <view class="card form-card">
-    <view class="form-row">
-      <view class="label">日期</view>
-      <picker mode="date" value="{{date}}" start="{{minDate}}" end="{{maxDate}}" bindchange="onDateChange">
-        <view class="picker-box">{{date}}</view>
-      </picker>
-    </view>
-    <view class="two-cols">
-      <view class="col">
-        <view class="label">开始</view>
-        <picker mode="selector" range="{{slots}}" value="{{startIndex}}" bindchange="onStartChange">
-          <view class="picker-box">{{startText}}</view>
-        </picker>
-      </view>
-      <view class="col">
-        <view class="label">结束</view>
-        <picker mode="selector" range="{{slots}}" value="{{endIndex}}" bindchange="onEndChange">
-          <view class="picker-box">{{endText}}</view>
-        </picker>
-      </view>
-    </view>
-    <view class="duration" wx:if="{{durationText}}">本次预约：{{durationText}} · 30 分钟粒度</view>
+    <picker mode="date" value="{{date}}" start="{{minDate}}" end="{{maxDate}}" bindchange="onDateChange">
+      <view class="date-picker">{{date}} <text>›</text></view>
+    </picker>
   </view>
 
-  <view class="section-title">使用信息</view>
+  <view class="section-title">2 · 选择连续时段</view>
+  <view class="card form-card">
+    <view class="slot-tip">首次点击选择一个半小时；继续点击相邻按钮可延长预约。</view>
+    <view class="slot-grid">
+      <view
+        wx:for="{{slotItems}}"
+        wx:key="index"
+        class="slot-button {{item.selected ? 'selected' : ''}} {{item.disabled ? 'disabled' : ''}}"
+        data-index="{{item.index}}"
+        bindtap="tapSlot"
+      >{{item.label}}</view>
+    </view>
+    <view class="duration" wx:if="{{durationText}}">已选 {{durationText}} · 30 分钟粒度</view>
+  </view>
+
+  <view class="section-title" wx:if="{{selectedSlots.length}}">3 · 选择空闲房间</view>
+  <view class="card form-card" wx:if="{{selectedSlots.length}}">
+    <view class="room-loading" wx:if="{{availabilityLoading}}">正在读取房间占用情况…</view>
+    <view class="room-grid" wx:else>
+      <view
+        wx:for="{{rooms}}"
+        wx:key="room_code"
+        class="room-option {{item.available ? '' : 'busy'}} {{selectedRoom === item.room_code ? 'selected' : ''}}"
+        data-room="{{item.room_code}}"
+        bindtap="chooseRoom"
+      >
+        <view class="room-head"><text class="room-code">{{item.room_code}}</text><text class="room-state">{{item.available ? '空闲' : '已占用'}}</text></view>
+        <view class="room-desc">{{item.description}}</view>
+        <view class="room-meta" wx:if="{{item.capacity_hint}}">参考容量：{{item.capacity_hint}} 人</view>
+        <view class="room-meta">适合：{{item.suitableText}}</view>
+      </view>
+    </view>
+    <view class="no-room" wx:if="{{!availabilityLoading && rooms.length && freeRoomCount === 0}}">该时段暂无空闲房间，请调整时间。</view>
+  </view>
+
+  <view class="section-title">4 · 使用信息</view>
   <view class="card form-card">
     <view class="label">人数</view>
     <input class="input" type="number" value="{{peopleCount}}" maxlength="3" placeholder="请输入实际人数" bindinput="onPeopleInput" />
     <view class="label purpose-label">具体用途</view>
-    <textarea class="textarea" value="{{purpose}}" maxlength="1000" auto-height="false" placeholder="请尽量具体，例如：期末考试周复习，需要安静座位" bindinput="onPurposeInput" />
+    <textarea class="textarea" value="{{purpose}}" maxlength="1000" auto-height="false" placeholder="请写清具体事项；只有“开会”“自习”等过短理由会被驳回" bindinput="onPurposeInput" />
     <view class="counter">{{purposeLength}} / 1000</view>
 
     <view class="example-title">可以这样写</view>
@@ -45,8 +62,8 @@
   </view>
 
   <view class="notice">
-    <view class="notice-title">提交后会发生什么？</view>
-    <view>AI 会进行秒批、打回或转人工审核；只有审批真正通过时才锁定房间。动态时长限制由后端根据用途判断。</view>
+    <view class="notice-title">房间选择也会参与审核</view>
+    <view>AI 会结合用途、人数、你选择的房间以及同一时段其他房间是否空闲进行判断。若更合适的高优先级房间仍空闲却选择了不合适房间，申请会被驳回并提示重新选择。</view>
   </view>
 
   <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">提交预约申请</button>

@@ -52,7 +52,7 @@ async function loadCleanup() {
 async function refreshAll() { await Promise.all([loadBookings(), loadUsers(), loadCleanup()]) }
 
 function openReview(item) {
-  review.value = { action: 'approve', room_code: item.candidate_rooms?.[0] || '', reason: '' }
+  review.value = { action: 'approve', room_code: item.requested_room_code || item.candidate_rooms?.[0] || '', reason: '' }
   modal.value = { type: 'review', item }
 }
 
@@ -149,7 +149,7 @@ onMounted(refreshAll)
         <tbody><tr v-for="b in bookings" :key="b.id">
           <td>#{{ b.id }}</td>
           <td><strong>{{ userMap[b.user_id]?.name || `用户${b.user_id}` }}</strong><br><span class="muted">{{ userMap[b.user_id]?.login_id || '' }} {{ userMap[b.user_id]?.class_name || '' }}</span></td>
-          <td>{{ fmtDateTime(b.start_time) }}<br>至 {{ fmtDateTime(b.end_time) }}<br><span class="badge blue">{{ b.room_code || '待分配' }}</span></td>
+          <td>{{ fmtDateTime(b.start_time) }}<br>至 {{ fmtDateTime(b.end_time) }}<br><span class="badge blue">最终：{{ b.room_code || '待分配' }}</span><br><span class="muted">用户选择：{{ b.requested_room_code || '—' }}</span></td>
           <td>{{ b.people_count }}</td>
           <td class="purpose">{{ b.purpose }}</td>
           <td><span>{{ b.intent_type || '—' }}</span><br><span class="muted">{{ b.ai_reason || b.ai_guidance || '—' }}</span></td>
@@ -179,7 +179,7 @@ onMounted(refreshAll)
         <div class="modal-head"><h3>{{ modal.type==='review' ? `审核预约 #${modal.item.id}` : modal.type==='super' ? '创建超级预约' : modal.type==='cleanup' ? `清扫核验 #${modal.item.booking_id}` : '修改用户状态' }}</h3><button class="btn btn-ghost" @click="modal=null">关闭</button></div>
         <div class="modal-body">
           <template v-if="modal.type==='review'">
-            <div class="form-grid"><div class="field"><label class="label">处理动作</label><select v-model="review.action" class="select" style="width:100%"><option value="approve">通过并锁房</option><option value="reject">驳回</option></select></div><div class="field" v-if="review.action==='approve'"><label class="label">指定房间（可留空按 AI 顺序）</label><select v-model="review.room_code" class="select" style="width:100%"><option value="">自动选择</option><option v-for="r in ROOM_CODES" :key="r">{{ r }}</option></select></div><div class="field wide"><label class="label">处理说明</label><textarea v-model="review.reason" class="textarea" placeholder="说明审批依据或驳回原因"></textarea></div></div>
+            <div class="form-grid"><div class="field"><label class="label">处理动作</label><select v-model="review.action" class="select" style="width:100%"><option value="approve">通过并锁房</option><option value="reject">驳回</option></select></div><div class="field" v-if="review.action==='approve'"><label class="label">指定房间（默认用户所选，可人工调整）</label><select v-model="review.room_code" class="select" style="width:100%"><option value="">自动选择</option><option v-for="r in ROOM_CODES" :key="r">{{ r }}</option></select></div><div class="field wide"><label class="label">处理说明</label><textarea v-model="review.reason" class="textarea" placeholder="说明审批依据或驳回原因"></textarea></div></div>
             <div class="modal-actions"><button class="btn btn-primary" @click="submitReview">确认处理</button></div>
           </template>
           <template v-else-if="modal.type==='super'">

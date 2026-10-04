@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hmac
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -14,9 +15,13 @@ from config import settings
 _password_hasher = PasswordHasher()
 
 
+def validate_password(password: str) -> None:
+    if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+        raise ValueError("密码必须同时包含字母和数字")
+
+
 def hash_password(password: str) -> str:
-    if len(password) < 8:
-        raise ValueError("密码至少需要 8 位")
+    validate_password(password)
     return _password_hasher.hash(password)
 
 

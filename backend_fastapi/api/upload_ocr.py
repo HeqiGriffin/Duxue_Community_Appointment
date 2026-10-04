@@ -1,6 +1,7 @@
 """离场现场照片上传与 OCR 容错核验。"""
 from __future__ import annotations
 
+import base64
 import io
 import json
 import re
@@ -22,7 +23,7 @@ from api.auth import require_admin, require_password_changed
 from config import get_db, settings
 from models.bookings import Booking, BookingStatus
 from models.users import User, UserStatus
-from utils.time_calc import APP_TZ, cleanup_deadline, ensure_local
+from utils.time_calc import APP_TZ, cleanup_deadline, cleanup_window_start, ensure_local
 
 router = APIRouter(prefix="/cleanup", tags=["cleanup"])
 ALLOWED_MIME = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
@@ -56,6 +57,11 @@ class CleanupPendingItem(BaseModel):
     photo_url: str
     ocr_result: str | None
     review_status: str
+
+
+class CleanupPhotoDataResponse(BaseModel):
+    content_type: str
+    base64_data: str
 
 
 def _edit_distance(a: str, b: str) -> int:
@@ -123,6 +129,61 @@ def _save_image(image_bytes: bytes, suffix: str, booking_id: int) -> str:
     return str(target)
 
 
+def _validate_cleanup_window(booking: Booking) -> None:
+    now = datetime.now(APP_TZ)
+    window_start = cleanup_window_start(booking.end_time)
+    deadline = cleanup_deadline(booking.end_time)
+    if now < window_start:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="离场实拍将在预约结束前 30 分钟开放",
+        )
+    if now > deadline:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="已超过离场实拍提交时限（预约结束后 30 分钟）",
+        )
+
+
+def _photo_content_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    return {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}.get(
+        suffix, "application/octet-stream"
+    )
+
+
+@router.get("/{booking_id}/photo-data", response_model=CleanupPhotoDataResponse)
+def get_own_cleanup_photo_data(
+    booking_id: int,
+    user: Annotated[User, Depends(require_password_changed)],
+    db: Annotated[Session, Depends(get_db)],
+) -> CleanupPhotoDataResponse:
+    booking = db.get(Booking, booking_id)
+    if booking is None or booking.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="预约不存在")
+    if not booking.cleanup_photo_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="尚未提交离场照片")
+    path = Path(booking.cleanup_photo_path)
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="离场照片文件不存在")
+    # 小程序通过 AnyService 读取预览图；为避免原图过大导致网关响应超限，
+    # 这里生成最长边 1280px 的 JPEG 预览，服务器仍保留原始上传文件。
+    try:
+        with Image.open(path) as image:
+            image.thumbnail((1280, 1280))
+            if image.mode not in ("RGB", "L"):
+                image = image.convert("RGB")
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=82, optimize=True)
+            preview = output.getvalue()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="生成照片预览失败") from exc
+    return CleanupPhotoDataResponse(
+        content_type="image/jpeg",
+        base64_data=base64.b64encode(preview).decode("ascii"),
+    )
+
+
 @router.post("/{booking_id}", response_model=CleanupUploadResponse)
 async def upload_cleanup_photo(
     booking_id: int,
@@ -136,8 +197,7 @@ async def upload_cleanup_photo(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="预约不存在")
     if booking.status not in {BookingStatus.ACTIVE, BookingStatus.AWAITING_CLEANUP}:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="当前预约状态不可提交离场照片")
-    if datetime.now(APP_TZ) < ensure_local(booking.end_time):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="预约尚未结束，不能提前提交离场照片")
+    _validate_cleanup_window(booking)
     if camera_source != "camera":
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="客户端必须使用实时相机拍摄")
 
@@ -218,11 +278,7 @@ def upload_cleanup_photo_cloud(
             detail="当前预约状态不可提交离场照片",
         )
 
-    if datetime.now(APP_TZ) < ensure_local(booking.end_time):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="预约尚未结束，不能提前提交离场照片",
-        )
+    _validate_cleanup_window(booking)
 
     if payload.camera_source != "camera":
         raise HTTPException(

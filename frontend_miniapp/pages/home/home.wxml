@@ -71,5 +71,6 @@
     <view class="booking-reason" wx:elif="{{item.ai_guidance && item.status === 'rejected'}}">建议：{{item.ai_guidance}}</view>
     <view class="action-hint" wx:if="{{item.canCheckin}}">当前可签到 →</view>
     <view class="action-hint warning-hint" wx:elif="{{item.canUploadCleanup}}">请完成离场实拍 →</view>
+    <view class="appeal-link" wx:elif="{{item.canAppeal}}" data-id="{{item.id}}" catchtap="goBookingAppeal">对驳回结果有异议？转人工申诉 →</view>
   </view>
 </view>

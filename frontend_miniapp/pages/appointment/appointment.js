@@ -10,23 +10,49 @@ function ymdFromOffset(days) {
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days))
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
 }
-function buildSlots() {
-  const result = []
-  for (let m = 0; m <= 23 * 60 + 30; m += 30) {
-    result.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`)
+function addDay(dateText, days) {
+  const [y, m, d] = dateText.split('-').map(Number)
+  const x = new Date(Date.UTC(y, m - 1, d + days))
+  return `${x.getUTCFullYear()}-${pad(x.getUTCMonth() + 1)}-${pad(x.getUTCDate())}`
+}
+function timeText(minutes) {
+  if (minutes === 24 * 60) return '24:00'
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
+}
+function apiDateTime(dateText, minutes) {
+  if (minutes === 24 * 60) return `${addDay(dateText, 1)}T00:00:00+08:00`
+  return `${dateText}T${timeText(minutes)}:00+08:00`
+}
+function buildSlots(dateText, selected = []) {
+  const today = ymdFromOffset(0)
+  const now = campusNowParts()
+  const nowMinutes = now.h * 60 + now.min
+  const selectedSet = new Set(selected)
+  const rows = []
+  for (let index = 0; index < 48; index += 1) {
+    const start = index * 30
+    const end = start + 30
+    rows.push({
+      index,
+      start,
+      end,
+      label: `${timeText(start)}–${timeText(end)}`,
+      selected: selectedSet.has(index),
+      disabled: dateText === today && start <= nowMinutes
+    })
   }
-  return result
+  return rows
 }
 
 Page({
   data: {
     date: '', minDate: '', maxDate: '',
-    slots: [], startIndex: -1, endIndex: -1,
-    startText: '请选择', endText: '请选择',
+    slotItems: [], selectedSlots: [],
+    durationText: '',
+    rooms: [], selectedRoom: '', availabilityLoading: false, freeRoomCount: 0,
     peopleCount: 1, purpose: '', purposeLength: 0,
     submitting: false,
-    durationText: '',
-    examples: ['期末考试周复习，需要安静座位', '班级例会，预计 8 人讨论工作', '心理剧排练，希望有较完整活动空间']
+    examples: ['期末考试周复习，需要安静座位', '班级例会，预计 8 人讨论本周工作安排', '心理剧排练，需要完整活动空间进行走位练习']
   },
 
   onLoad() {
@@ -35,77 +61,136 @@ Page({
       wx.showModal({ title: '当前不可预约', content: '账号状态或密码状态不允许发起预约。', showCancel: false, success: () => wx.navigateBack() })
       return
     }
-    const slots = buildSlots()
-    this.setData({ date: ymdFromOffset(1), minDate: ymdFromOffset(0), maxDate: ymdFromOffset(60), slots })
+    const date = ymdFromOffset(1)
+    this.setData({
+      date,
+      minDate: ymdFromOffset(0),
+      maxDate: ymdFromOffset(60),
+      slotItems: buildSlots(date)
+    })
   },
 
-  onDateChange(e) { this.setData({ date: e.detail.value }); this.ensureFutureSelection() },
+  onDateChange(e) {
+    const date = e.detail.value
+    this.setData({
+      date,
+      selectedSlots: [],
+      slotItems: buildSlots(date),
+      durationText: '',
+      rooms: [],
+      selectedRoom: '',
+      freeRoomCount: 0
+    })
+  },
+
   onPeopleInput(e) {
     const value = String(e.detail.value || '').replace(/\D/g, '')
     this.setData({ peopleCount: value ? Math.min(500, Number(value)) : '' })
   },
+
   onPurposeInput(e) {
     const purpose = e.detail.value
     this.setData({ purpose, purposeLength: purpose.length })
   },
+
   useExample(e) {
     const purpose = e.currentTarget.dataset.text
     this.setData({ purpose, purposeLength: purpose.length })
   },
 
-  onStartChange(e) {
-    const startIndex = Number(e.detail.value)
-    let endIndex = this.data.endIndex
-    if (endIndex <= startIndex) endIndex = Math.min(startIndex + 1, this.data.slots.length - 1)
-    this.setData({
-      startIndex,
-      endIndex,
-      startText: this.data.slots[startIndex],
-      endText: endIndex >= 0 ? this.data.slots[endIndex] : '请选择'
-    })
-    this.updateDuration()
-  },
-
-  onEndChange(e) {
-    const endIndex = Number(e.detail.value)
-    if (this.data.startIndex >= 0 && endIndex <= this.data.startIndex) {
-      wx.showToast({ title: '结束时间必须晚于开始时间', icon: 'none' })
+  tapSlot(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const item = this.data.slotItems[index]
+    if (!item || item.disabled) {
+      wx.showToast({ title: '该时段已过', icon: 'none' })
       return
     }
-    this.setData({ endIndex, endText: this.data.slots[endIndex] })
-    this.updateDuration()
+
+    let selected = [...this.data.selectedSlots].sort((a, b) => a - b)
+    if (!selected.length) {
+      selected = [index]
+    } else {
+      const first = selected[0]
+      const last = selected[selected.length - 1]
+      if (selected.includes(index)) {
+        if (selected.length === 1) selected = []
+        else if (index === first) selected.shift()
+        else if (index === last) selected.pop()
+        else selected = [index]
+      } else if (index === last + 1) {
+        selected.push(index)
+      } else if (index === first - 1) {
+        selected.unshift(index)
+      } else {
+        selected = [index]
+      }
+    }
+
+    const minutes = selected.length * 30
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    const durationText = selected.length
+      ? (h ? `${h} 小时${m ? ` ${m} 分钟` : ''}` : `${m} 分钟`)
+      : ''
+
+    this.setData({
+      selectedSlots: selected,
+      slotItems: buildSlots(this.data.date, selected),
+      durationText,
+      rooms: [],
+      selectedRoom: '',
+      freeRoomCount: 0
+    })
+
+    if (selected.length) this.loadAvailability()
   },
 
-  updateDuration() {
-    const { startIndex, endIndex } = this.data
-    if (startIndex < 0 || endIndex < 0 || endIndex <= startIndex) {
-      this.setData({ durationText: '' }); return
+  selectedRange() {
+    const selected = [...this.data.selectedSlots].sort((a, b) => a - b)
+    if (!selected.length) return null
+    const first = selected[0]
+    const last = selected[selected.length - 1]
+    return {
+      startTime: apiDateTime(this.data.date, first * 30),
+      endTime: apiDateTime(this.data.date, (last + 1) * 30)
     }
-    const minutes = (endIndex - startIndex) * 30
-    const h = Math.floor(minutes / 60), m = minutes % 60
-    this.setData({ durationText: h ? `${h} 小时${m ? ` ${m} 分钟` : ''}` : `${m} 分钟` })
   },
 
-  ensureFutureSelection() {
-    // 真正合法性以后端为准；这里只在“今天”选到过去时给即时提示。
-    const { date, startIndex, slots } = this.data
-    if (startIndex < 0 || date !== ymdFromOffset(0)) return true
-    const now = campusNowParts()
-    const [h, m] = slots[startIndex].split(':').map(Number)
-    if (h * 60 + m <= now.h * 60 + now.min) {
-      wx.showToast({ title: '开始时间必须晚于当前时间', icon: 'none' })
-      return false
+  async loadAvailability() {
+    const range = this.selectedRange()
+    if (!range || this.data.availabilityLoading) return
+    this.setData({ availabilityLoading: true })
+    try {
+      const result = await request({
+        url: '/bookings/availability',
+        query: { start_time: range.startTime, end_time: range.endTime }
+      })
+      const rooms = (result.rooms || []).map(x => ({ ...x, suitableText: (x.suitable || []).join('、') }))
+      this.setData({ rooms, freeRoomCount: rooms.filter(x => x.available).length })
+    } catch (err) {
+      this.setData({ rooms: [], freeRoomCount: 0 })
+      wx.showToast({ title: err.message || '读取空闲房间失败', icon: 'none', duration: 3000 })
+    } finally {
+      this.setData({ availabilityLoading: false })
     }
-    return true
+  },
+
+  chooseRoom(e) {
+    const roomCode = e.currentTarget.dataset.room
+    const room = this.data.rooms.find(x => x.room_code === roomCode)
+    if (!room || !room.available) return
+    this.setData({ selectedRoom: roomCode })
   },
 
   async submit() {
-    const { date, startIndex, endIndex, slots, peopleCount, purpose, submitting } = this.data
+    const { selectedSlots, selectedRoom, peopleCount, purpose, submitting } = this.data
     if (submitting) return
-    if (!date || startIndex < 0 || endIndex < 0 || endIndex <= startIndex) {
-      wx.showToast({ title: '请选择完整预约时间', icon: 'none' }); return
+    if (!selectedSlots.length) {
+      wx.showToast({ title: '请先选择预约时段', icon: 'none' }); return
     }
-    if (!this.ensureFutureSelection()) return
+    if (!selectedRoom) {
+      wx.showToast({ title: '请选择一个空闲房间', icon: 'none' }); return
+    }
     if (!peopleCount || peopleCount < 1) {
       wx.showToast({ title: '请输入预约人数', icon: 'none' }); return
     }
@@ -113,27 +198,31 @@ Page({
       wx.showToast({ title: '请说明具体用途', icon: 'none' }); return
     }
 
-    // 后端当前限定单笔不跨自然日，因此前端只提供 00:00 ~ 23:30 边界内的 30 分钟节点。
-    const startTime = `${date}T${slots[startIndex]}:00+08:00`
-    const endTime = `${date}T${slots[endIndex]}:00+08:00`
+    const range = this.selectedRange()
+    if (!range) return
     this.setData({ submitting: true })
     try {
       const result = await request({
-        url: '/bookings', method: 'POST', loading: true, loadingText: 'AI 正在审核',
-        data: { start_time: startTime, end_time: endTime, people_count: Number(peopleCount), purpose: purpose.trim() }
+        url: '/bookings', method: 'POST', loading: true, loadingText: '正在提交',
+        data: {
+          start_time: range.startTime,
+          end_time: range.endTime,
+          room_code: selectedRoom,
+          people_count: Number(peopleCount),
+          purpose: purpose.trim()
+        }
       })
-      const messages = {
-        approved: '预约已通过并锁定房间', pending_manual: '已提交，等待管理员审核',
-        rejected: '申请未通过', invalidated: '候选房间已被占用'
-      }
       wx.showModal({
-        title: messages[result.status] || '预约已提交',
-        content: result.rejection_reason || result.ai_reason || result.ai_guidance || (result.room_code ? `房间：${result.room_code}` : '可在首页查看最新状态'),
+        title: '预约已提交',
+        content: result.status === 'pending_ai'
+          ? `已选择 ${selectedRoom}，AI 正在后台审核，可在首页查看结果。`
+          : (result.rejection_reason || result.ai_reason || '可在首页查看最新状态'),
         showCancel: false,
         success: () => wx.navigateBack()
       })
     } catch (err) {
       wx.showToast({ title: err.message || '提交失败', icon: 'none', duration: 3000 })
+      if (err.statusCode === 409) this.loadAvailability()
     } finally {
       this.setData({ submitting: false })
     }

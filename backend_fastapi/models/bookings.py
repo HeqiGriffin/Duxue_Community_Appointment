@@ -62,6 +62,7 @@ class Booking(Base):
 
     # AI 给出按优先级排列的候选房间(JSON 数组字符串)，真正通过时再原子抢占。
     candidate_rooms_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_room_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     room_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
 
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

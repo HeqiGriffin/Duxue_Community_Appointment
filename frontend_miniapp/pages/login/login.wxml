@@ -8,27 +8,29 @@
   <view class="login-card" wx:if="{{!changeMode}}">
     <view class="card-title">账号登录</view>
     <view class="card-note">系统采用后台白名单，无需自行注册</view>
+    <view class="error-banner" wx:if="{{errorMessage}}">{{errorMessage}}</view>
     <view class="field">
       <view class="label">学号 / 工号</view>
       <input class="input" value="{{loginId}}" maxlength="64" placeholder="请输入学号或工号" bindinput="onLoginIdInput" />
     </view>
     <view class="field">
       <view class="label">密码</view>
-      <input class="input" value="{{password}}" password maxlength="128" placeholder="请输入密码" bindinput="onPasswordInput" confirm-type="done" bindconfirm="submitLogin" />
+      <input class="input" value="{{password}}" password maxlength="-1" placeholder="请输入密码" bindinput="onPasswordInput" confirm-type="done" bindconfirm="submitLogin" />
     </view>
     <button class="btn-primary login-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitLogin">登录</button>
   </view>
 
   <view class="login-card" wx:else>
     <view class="card-title">首次登录 · 修改密码</view>
-    <view class="card-note">{{displayName}}，为保护账号安全，请先设置新的登录密码。</view>
+    <view class="card-note">{{displayName}}，为保护账号安全，请先设置新的登录密码。密码只要求同时包含字母和数字，特殊符号可自由使用。</view>
+    <view class="error-banner" wx:if="{{errorMessage}}">{{errorMessage}}</view>
     <view class="field">
       <view class="label">新密码</view>
-      <input class="input" value="{{newPassword}}" password maxlength="128" placeholder="至少 8 位" bindinput="onNewPasswordInput" />
+      <input class="input" value="{{newPassword}}" password maxlength="-1" placeholder="至少包含 1 个字母和 1 个数字" bindinput="onNewPasswordInput" />
     </view>
     <view class="field">
       <view class="label">确认新密码</view>
-      <input class="input" value="{{confirmPassword}}" password maxlength="128" placeholder="再次输入新密码" bindinput="onConfirmPasswordInput" confirm-type="done" bindconfirm="submitPasswordChange" />
+      <input class="input" value="{{confirmPassword}}" password maxlength="-1" placeholder="再次输入新密码" bindinput="onConfirmPasswordInput" confirm-type="done" bindconfirm="submitPasswordChange" />
     </view>
     <button class="btn-primary login-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitPasswordChange">保存并进入系统</button>
   </view>
