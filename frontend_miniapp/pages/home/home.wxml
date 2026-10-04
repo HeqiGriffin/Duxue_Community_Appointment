@@ -66,7 +66,8 @@
       <view class="status status-{{item.statusClass}}">{{item.statusText}}</view>
     </view>
     <view class="booking-purpose">{{item.purpose}}</view>
-    <view class="booking-meta">{{item.timeText}} · {{item.people_count}} 人</view>
+    <view class="booking-meta">{{item.timeText}} · {{item.people_count}} 人 · {{item.usageModeText}}</view>
+    <view class="booking-reason" wx:if="{{item.allocation_note}}">调剂：{{item.allocation_note}}</view>
     <view class="booking-reason" wx:if="{{item.rejection_reason}}">原因：{{item.rejection_reason}}</view>
     <view class="booking-reason" wx:elif="{{item.ai_guidance && item.status === 'rejected'}}">建议：{{item.ai_guidance}}</view>
     <view class="action-hint" wx:if="{{item.canCheckin}}">当前可签到 →</view>

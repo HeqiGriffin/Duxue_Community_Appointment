@@ -14,7 +14,7 @@ const error = ref('')
 
 function goHome(s) {
   if (s.role === 'admin') router.replace('/admin/bookings')
-  else if (s.mode === 'duty') router.replace('/duty/rooms')
+  else if (s.mode === 'duty') router.replace('/duty/handover')
   else router.replace('/forbidden')
 }
 

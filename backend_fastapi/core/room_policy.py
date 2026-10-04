@@ -6,13 +6,13 @@ from dataclasses import dataclass
 ROOM_CATALOG: dict[str, dict[str, object]] = {
     "A101": {
         "capacity_hint": 10,
-        "suitable": ["自习", "会议", "通用活动"],
-        "description": "中小型通用空间",
+        "suitable": ["自习共享", "会议", "通用活动"],
+        "description": "中小型空间；自习时允许多人共享",
     },
     "A102": {
         "capacity_hint": 6,
-        "suitable": ["自习", "小型会议"],
-        "description": "小型安静空间",
+        "suitable": ["自习共享", "小型会议"],
+        "description": "小型安静空间；自习优先集中使用",
     },
     "A103": {
         "capacity_hint": None,
@@ -21,7 +21,7 @@ ROOM_CATALOG: dict[str, dict[str, object]] = {
     },
     "A105": {
         "capacity_hint": 10,
-        "suitable": ["会议", "自习", "通用活动"],
+        "suitable": ["会议", "通用活动"],
         "description": "10 人左右会议优先空间",
     },
     "B102": {
@@ -67,9 +67,9 @@ def priority_rooms(intent_type: str | None, people_count: int) -> list[str]:
         return ["A103"]
     if intent == "study":
         if people_count <= 6:
-            return ["A102", "A101", "A105"]
+            return ["A102", "A101"]
         if people_count <= 10:
-            return ["A101", "A105"]
+            return ["A101"]
         return []
     if intent == "music":
         return ["B102", "A103"]

@@ -58,6 +58,8 @@ class Booking(Base):
     # 前端只提交自然语言用途；intent_type 只是 AI 的内部标签，不暴露成固定场景选择。
     purpose: Mapped[str] = mapped_column(Text, nullable=False)
     people_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # study=自习共享；exclusive=非自习独占。旧数据由兼容迁移自动识别。
+    usage_mode: Mapped[str] = mapped_column(String(16), default="exclusive", nullable=False, index=True)
     intent_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     # AI 给出按优先级排列的候选房间(JSON 数组字符串)，真正通过时再原子抢占。

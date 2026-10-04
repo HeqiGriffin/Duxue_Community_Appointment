@@ -9,7 +9,7 @@ from typing import Literal
 import httpx
 
 from config import settings
-from core.room_policy import ROOM_CATALOG, ROOM_CODES, priority_rooms, validate_room_choice
+from core.room_policy import ROOM_CATALOG, ROOM_CODES, normalize_intent, priority_rooms, validate_room_choice
 
 Decision = Literal["approve", "reject", "manual"]
 
@@ -98,9 +98,11 @@ def _system_prompt() -> str:
 6. 时长动态判断，不使用统一 4 小时上限。自习类按合理需求可放宽到每日 12 小时；其他用途按实际合理性判断。
 7. 时长必须为 30 分钟整数倍，daily_limit_minutes 与 single_limit_minutes 均在 30..1440 之间。
 8. candidate_rooms 只能来自：{room_text}。应结合用途、人数、用户选择和当前空闲房间排序。
-9. 会议确定性优先级：1-6 人优先 A102；7-10 人优先 A105，其次 A101；超过 10 人优先 A103。若更高优先级且适合的房间当前仍空闲，却选择较低优先级房间，应 reject。
-10. 例如：10 人开会且 A105 空闲时选择 A103，应 reject；若适合人数规模的更优房间已占用，可使用下一顺位；20 人或 70 人以上会议选择 A103 属于合理方向。
-11. confidence 表示判断把握度；低把握时优先 manual，不要冒险秒批。
+9. usage_mode=study 表示“自习共享”：只允许 A101/A102，且同一时段可与其他自习者共享；这种情况下不要因为房间已有自习而判冲突，后端会按座位容量和集中调剂规则最终分配。
+10. usage_mode=exclusive 表示“非自习独占”：若用途本质上是自习，应 reject 并提示改用自习共享；若房间已有自习，则该房间对非自习用途封闭。
+11. 会议确定性优先级：1-6 人优先 A102；7-10 人优先 A105，其次 A101；超过 10 人优先 A103。若更高优先级且适合的房间当前仍空闲，却选择较低优先级房间，应 reject。
+12. 例如：10 人开会且 A105 空闲时选择 A103，应 reject；若适合人数规模的更优房间已占用，可使用下一顺位；20 人或 70 人以上会议选择 A103 属于合理方向。
+13. confidence 表示判断把握度；低把握时优先 manual，不要冒险秒批。
 """.strip()
 
 
@@ -192,11 +194,13 @@ def audit_booking_with_ai(
     end_iso: str,
     selected_room: str,
     available_rooms: list[str],
+    usage_mode: str = "exclusive",
 ) -> AIAuditResult:
     """调用 AI 完成三级分流，并由确定性规则复核房间选择。"""
     purpose = purpose.strip()
     selected_room = selected_room.upper().strip()
     available_rooms = [r for r in available_rooms if r in ROOM_CODES]
+    usage_mode = "study" if usage_mode == "study" else "exclusive"
 
     # 先做确定性质量门槛，确保“开会”这类过短理由不会被模型偶然放行。
     if _effective_purpose_length(purpose) < 6:
@@ -223,6 +227,7 @@ def audit_booking_with_ai(
         "end_time": end_iso,
         "selected_room": selected_room,
         "available_rooms": available_rooms,
+        "usage_mode": usage_mode,
     }
     headers = {
         "Authorization": f"Bearer {settings.ai_api_key}",
@@ -251,7 +256,29 @@ def audit_booking_with_ai(
     except Exception as exc:  # noqa: BLE001
         return _manual_result(f"AI 审核暂不可用，已转人工：{type(exc).__name__}", available_rooms)
 
-    # 硬规则在 AI 之后再次复核，避免模型把明显不合理的房间选择放行。
+    normalized_intent = normalize_intent(result.intent_type)
+    if usage_mode == "study":
+        if normalized_intent != "study":
+            return _reject_result(
+                "所选预约方式为“自习共享”，但申请理由并非明确自习用途",
+                "若是自习，请补充具体学习/复习任务；若为会议、活动等用途，请改选“非自习独占”。",
+                candidate_rooms=[r for r in available_rooms if r in {"A101", "A102"}],
+                intent_type=result.intent_type,
+                confidence=max(result.confidence, 90),
+            )
+        result.candidate_rooms = [r for r in ("A102", "A101") if r in available_rooms]
+        return result
+
+    if normalized_intent == "study":
+        return _reject_result(
+            "自习用途应使用“自习共享”预约方式",
+            "请返回预约页选择“自习共享”，系统会将自习同学集中调剂到 A101/A102。",
+            candidate_rooms=[r for r in ("A102", "A101") if r in available_rooms],
+            intent_type=result.intent_type,
+            confidence=max(result.confidence, 90),
+        )
+
+    # 非自习继续执行房间优先级硬校验。
     issue = validate_room_choice(
         intent_type=result.intent_type,
         people_count=people_count,

@@ -88,3 +88,29 @@ class DutyLog(Base):
     scheduled_class: Mapped[str] = mapped_column(String(128), nullable=False)
     checkin_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     handover_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    handover_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DutyPatrol(Base):
+    """两小时值班中的定时巡视任务。每班固定两次：开班后 30 / 90 分钟。"""
+
+    __tablename__ = "duty_patrols"
+    __table_args__ = (UniqueConstraint("duty_log_id", "sequence", name="uq_duty_patrol_sequence"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    duty_log_id: Mapped[int] = mapped_column(ForeignKey("duty_logs.id", ondelete="CASCADE"), nullable=False, index=True)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    booking_match_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    hygiene_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    safety_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    order_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    facility_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    issue_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )

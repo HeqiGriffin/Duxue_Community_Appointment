@@ -47,12 +47,14 @@ function buildSlots(dateText, selected = []) {
 Page({
   data: {
     date: '', minDate: '', maxDate: '',
+    usageMode: 'study',
     slotItems: [], selectedSlots: [],
     durationText: '',
     rooms: [], selectedRoom: '', availabilityLoading: false, freeRoomCount: 0,
+    allocationNote: '', recommendedRoom: '',
     peopleCount: 1, purpose: '', purposeLength: 0,
     submitting: false,
-    examples: ['期末考试周复习，需要安静座位', '班级例会，预计 8 人讨论本周工作安排', '心理剧排练，需要完整活动空间进行走位练习']
+    examples: ['期末考试周复习数学分析，需要安静学习', '班级例会，预计 8 人讨论本周工作安排', '心理剧排练，需要完整活动空间进行走位练习']
   },
 
   onLoad() {
@@ -79,13 +81,26 @@ Page({
       durationText: '',
       rooms: [],
       selectedRoom: '',
-      freeRoomCount: 0
+      freeRoomCount: 0,
+      allocationNote: '',
+      recommendedRoom: ''
     })
+  },
+
+  chooseUsageMode(e) {
+    const usageMode = e.currentTarget.dataset.mode
+    if (!['study', 'exclusive'].includes(usageMode) || usageMode === this.data.usageMode) return
+    this.setData({ usageMode, rooms: [], selectedRoom: '', allocationNote: '', recommendedRoom: '' })
+    if (this.data.selectedSlots.length) this.loadAvailability()
   },
 
   onPeopleInput(e) {
     const value = String(e.detail.value || '').replace(/\D/g, '')
     this.setData({ peopleCount: value ? Math.min(500, Number(value)) : '' })
+    if (this.data.selectedSlots.length) {
+      clearTimeout(this._peopleTimer)
+      this._peopleTimer = setTimeout(() => this.loadAvailability(), 250)
+    }
   },
 
   onPurposeInput(e) {
@@ -139,7 +154,9 @@ Page({
       durationText,
       rooms: [],
       selectedRoom: '',
-      freeRoomCount: 0
+      freeRoomCount: 0,
+      allocationNote: '',
+      recommendedRoom: ''
     })
 
     if (selected.length) this.loadAvailability()
@@ -159,17 +176,36 @@ Page({
   async loadAvailability() {
     const range = this.selectedRange()
     if (!range || this.data.availabilityLoading) return
+    const peopleCount = Number(this.data.peopleCount || 1)
     this.setData({ availabilityLoading: true })
     try {
       const result = await request({
         url: '/bookings/availability',
-        query: { start_time: range.startTime, end_time: range.endTime }
+        query: {
+          start_time: range.startTime,
+          end_time: range.endTime,
+          usage_mode: this.data.usageMode,
+          people_count: peopleCount
+        }
       })
-      const rooms = (result.rooms || []).map(x => ({ ...x, suitableText: (x.suitable || []).join('、') }))
-      this.setData({ rooms, freeRoomCount: rooms.filter(x => x.available).length })
+      const rooms = (result.rooms || []).map(x => ({
+        ...x,
+        suitableText: (x.suitable || []).join('、'),
+        stateClass: x.available ? (x.occupancy_mode === 'study_shared' ? 'shared' : 'free') : 'busy'
+      }))
+      let selectedRoom = this.data.selectedRoom
+      if (!rooms.some(x => x.room_code === selectedRoom && x.available)) selectedRoom = ''
+      if (this.data.usageMode === 'study' && result.recommended_room_code) selectedRoom = result.recommended_room_code
+      this.setData({
+        rooms,
+        selectedRoom,
+        freeRoomCount: rooms.filter(x => x.available).length,
+        allocationNote: result.allocation_note || '',
+        recommendedRoom: result.recommended_room_code || ''
+      })
     } catch (err) {
-      this.setData({ rooms: [], freeRoomCount: 0 })
-      wx.showToast({ title: err.message || '读取空闲房间失败', icon: 'none', duration: 3000 })
+      this.setData({ rooms: [], freeRoomCount: 0, allocationNote: '', recommendedRoom: '' })
+      wx.showToast({ title: err.message || '读取房间状态失败', icon: 'none', duration: 3000 })
     } finally {
       this.setData({ availabilityLoading: false })
     }
@@ -183,20 +219,12 @@ Page({
   },
 
   async submit() {
-    const { selectedSlots, selectedRoom, peopleCount, purpose, submitting } = this.data
+    const { selectedSlots, selectedRoom, peopleCount, purpose, submitting, usageMode } = this.data
     if (submitting) return
-    if (!selectedSlots.length) {
-      wx.showToast({ title: '请先选择预约时段', icon: 'none' }); return
-    }
-    if (!selectedRoom) {
-      wx.showToast({ title: '请选择一个空闲房间', icon: 'none' }); return
-    }
-    if (!peopleCount || peopleCount < 1) {
-      wx.showToast({ title: '请输入预约人数', icon: 'none' }); return
-    }
-    if (!purpose.trim() || purpose.trim().length < 2) {
-      wx.showToast({ title: '请说明具体用途', icon: 'none' }); return
-    }
+    if (!selectedSlots.length) { wx.showToast({ title: '请先选择预约时段', icon: 'none' }); return }
+    if (!selectedRoom) { wx.showToast({ title: '请选择一个当前可预约的房间', icon: 'none' }); return }
+    if (!peopleCount || peopleCount < 1) { wx.showToast({ title: '请输入预约人数', icon: 'none' }); return }
+    if (!purpose.trim() || purpose.trim().length < 2) { wx.showToast({ title: '请说明具体用途', icon: 'none' }); return }
 
     const range = this.selectedRange()
     if (!range) return
@@ -208,20 +236,22 @@ Page({
           start_time: range.startTime,
           end_time: range.endTime,
           room_code: selectedRoom,
+          usage_mode: usageMode,
           people_count: Number(peopleCount),
           purpose: purpose.trim()
         }
       })
+      const studyTip = usageMode === 'study' ? '\n自习最终房间会在审核通过时按实时座位集中调剂。' : ''
       wx.showModal({
         title: '预约已提交',
         content: result.status === 'pending_ai'
-          ? `已选择 ${selectedRoom}，AI 正在后台审核，可在首页查看结果。`
+          ? `已选择 ${selectedRoom}，AI 正在后台审核，可在首页查看结果。${studyTip}`
           : (result.rejection_reason || result.ai_reason || '可在首页查看最新状态'),
         showCancel: false,
         success: () => wx.navigateBack()
       })
     } catch (err) {
-      wx.showToast({ title: err.message || '提交失败', icon: 'none', duration: 3000 })
+      wx.showToast({ title: err.message || '提交失败', icon: 'none', duration: 3500 })
       if (err.statusCode === 409) this.loadAvailability()
     } finally {
       this.setData({ submitting: false })

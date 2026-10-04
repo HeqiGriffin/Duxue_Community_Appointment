@@ -239,6 +239,16 @@ def me(
     )
 
 
+@router.get("/terminal-status")
+def terminal_status(
+    request: Request,
+    _: Annotated[User, Depends(require_password_changed)],
+    x_duty_terminal_token: Annotated[str | None, Header(alias="X-Duty-Terminal-Token")] = None,
+) -> dict[str, bool]:
+    """供管理员在值班电脑上验证浏览器是否已绑定值班终端 Token。"""
+    return {"is_duty_terminal": _is_duty_terminal(request, x_duty_terminal_token)}
+
+
 @router.get("/admin/users", response_model=list[AdminUserItem])
 def admin_users(
     _: Annotated[User, Depends(require_admin)],

@@ -1,8 +1,8 @@
 <view class="container appointment-page">
   <view class="intro card">
     <view class="intro-badge">AI 智能审核</view>
-    <view class="intro-title">先选时间，再选空闲房间</view>
-    <view class="intro-note">每个按钮代表 30 分钟。请选择连续时段，系统会立即显示该时段仍空闲的房间。</view>
+    <view class="intro-title">先定使用方式，再看实时房态</view>
+    <view class="intro-note">自习与其他用途采用不同占用规则：自习可在 A101/A102 共享，其他用途则独占房间。</view>
   </view>
 
   <view class="section-title">1 · 预约日期</view>
@@ -12,9 +12,23 @@
     </picker>
   </view>
 
-  <view class="section-title">2 · 选择连续时段</view>
+  <view class="section-title">2 · 使用方式</view>
   <view class="card form-card">
-    <view class="slot-tip">首次点击选择一个半小时；继续点击相邻按钮可延长预约。</view>
+    <view class="mode-grid">
+      <view class="mode-option {{usageMode === 'study' ? 'selected' : ''}}" data-mode="study" bindtap="chooseUsageMode">
+        <view class="mode-title">自习共享</view>
+        <view class="mode-note">A101 / A102 可多人共享；系统优先集中安排，节约空间。</view>
+      </view>
+      <view class="mode-option {{usageMode === 'exclusive' ? 'selected' : ''}}" data-mode="exclusive" bindtap="chooseUsageMode">
+        <view class="mode-title">非自习独占</view>
+        <view class="mode-note">会议、活动、音乐等用途；同一时段房间只服务一笔预约。</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-title">3 · 选择连续时段</view>
+  <view class="card form-card">
+    <view class="slot-tip">每个按钮代表 30 分钟。继续点击相邻按钮可延长预约。</view>
     <view class="slot-grid">
       <view
         wx:for="{{slotItems}}"
@@ -27,27 +41,32 @@
     <view class="duration" wx:if="{{durationText}}">已选 {{durationText}} · 30 分钟粒度</view>
   </view>
 
-  <view class="section-title" wx:if="{{selectedSlots.length}}">3 · 选择空闲房间</view>
+  <view class="section-title" wx:if="{{selectedSlots.length}}">4 · 实时房间状态</view>
   <view class="card form-card" wx:if="{{selectedSlots.length}}">
-    <view class="room-loading" wx:if="{{availabilityLoading}}">正在读取房间占用情况…</view>
+    <view class="allocation-note" wx:if="{{allocationNote}}">{{allocationNote}}</view>
+    <view class="room-loading" wx:if="{{availabilityLoading}}">正在读取该时段房间状态…</view>
     <view class="room-grid" wx:else>
       <view
         wx:for="{{rooms}}"
         wx:key="room_code"
-        class="room-option {{item.available ? '' : 'busy'}} {{selectedRoom === item.room_code ? 'selected' : ''}}"
+        class="room-option {{item.stateClass}} {{selectedRoom === item.room_code ? 'selected' : ''}}"
         data-room="{{item.room_code}}"
         bindtap="chooseRoom"
       >
-        <view class="room-head"><text class="room-code">{{item.room_code}}</text><text class="room-state">{{item.available ? '空闲' : '已占用'}}</text></view>
+        <view class="room-head">
+          <view><text class="room-code">{{item.room_code}}</text><text class="recommend" wx:if="{{item.recommended}}">系统优先</text></view>
+          <text class="room-state">{{item.state_text}}</text>
+        </view>
         <view class="room-desc">{{item.description}}</view>
         <view class="room-meta" wx:if="{{item.capacity_hint}}">参考容量：{{item.capacity_hint}} 人</view>
+        <view class="room-meta" wx:if="{{item.occupancy_mode === 'study_shared'}}">当前自习人数：{{item.study_people}}；剩余容量：{{item.remaining_capacity}}</view>
         <view class="room-meta">适合：{{item.suitableText}}</view>
       </view>
     </view>
-    <view class="no-room" wx:if="{{!availabilityLoading && rooms.length && freeRoomCount === 0}}">该时段暂无空闲房间，请调整时间。</view>
+    <view class="no-room" wx:if="{{!availabilityLoading && rooms.length && freeRoomCount === 0}}">当前方式下没有可用房间，请调整时段、人数或使用方式。</view>
   </view>
 
-  <view class="section-title">4 · 使用信息</view>
+  <view class="section-title">5 · 使用信息</view>
   <view class="card form-card">
     <view class="label">人数</view>
     <input class="input" type="number" value="{{peopleCount}}" maxlength="3" placeholder="请输入实际人数" bindinput="onPeopleInput" />
@@ -62,8 +81,9 @@
   </view>
 
   <view class="notice">
-    <view class="notice-title">房间选择也会参与审核</view>
-    <view>AI 会结合用途、人数、你选择的房间以及同一时段其他房间是否空闲进行判断。若更合适的高优先级房间仍空闲却选择了不合适房间，申请会被驳回并提示重新选择。</view>
+    <view class="notice-title">房态与审核是两道规则</view>
+    <view wx:if="{{usageMode === 'study'}}">已有自习不会把 A101/A102 整间锁死，只要仍有容量就可以继续预约；系统会优先把自习同学集中到同一间房。</view>
+    <view wx:else>非自习用途为独占使用；若 A101/A102 已有自习，页面会直接显示“仅自习可继续预约”，无需等 AI 审核后才发现冲突。</view>
   </view>
 
   <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">提交预约申请</button>

@@ -16,7 +16,7 @@ const userKeyword = ref('')
 const cleanupItems = ref([])
 const modal = ref(null)
 const review = ref({ action: 'approve', room_code: '', reason: '' })
-const superForm = ref({ user_id: '', room_code: 'A101', start_time: '', end_time: '', people_count: 1, purpose: '' })
+const superForm = ref({ user_id: '', room_code: 'A101', usage_mode: 'exclusive', start_time: '', end_time: '', people_count: 1, purpose: '' })
 const userAction = ref({ action: 'freeze', reason: '' })
 const photoUrl = ref('')
 
@@ -150,7 +150,7 @@ onMounted(refreshAll)
           <td>#{{ b.id }}</td>
           <td><strong>{{ userMap[b.user_id]?.name || `用户${b.user_id}` }}</strong><br><span class="muted">{{ userMap[b.user_id]?.login_id || '' }} {{ userMap[b.user_id]?.class_name || '' }}</span></td>
           <td>{{ fmtDateTime(b.start_time) }}<br>至 {{ fmtDateTime(b.end_time) }}<br><span class="badge blue">最终：{{ b.room_code || '待分配' }}</span><br><span class="muted">用户选择：{{ b.requested_room_code || '—' }}</span></td>
-          <td>{{ b.people_count }}</td>
+          <td>{{ b.people_count }}<br><span class="muted">{{ b.usage_mode==='study'?'自习共享':'非自习独占' }}</span></td>
           <td class="purpose">{{ b.purpose }}</td>
           <td><span>{{ b.intent_type || '—' }}</span><br><span class="muted">{{ b.ai_reason || b.ai_guidance || '—' }}</span></td>
           <td><span class="badge" :class="badgeClass(b.status)">{{ statusText[b.status] || b.status }}</span><br><span v-if="b.is_violation" class="badge red" style="margin-top:6px">违规：{{ b.violation_reason || '已标记' }}</span><br><span v-if="b.cleanup_review_status" class="badge gray" style="margin-top:6px">{{ statusText[b.cleanup_review_status] || b.cleanup_review_status }}</span></td>
@@ -185,6 +185,7 @@ onMounted(refreshAll)
           <template v-else-if="modal.type==='super'">
             <div class="form-grid">
               <div class="field"><label class="label">预约用户</label><select v-model="superForm.user_id" class="select" style="width:100%"><option value="">请选择</option><option v-for="u in users.filter(x=>x.role==='student')" :key="u.id" :value="u.id">{{ u.name }}（{{ u.login_id }} / {{ u.class_name || '无班级' }}）</option></select></div>
+              <div class="field"><label class="label">使用方式</label><select v-model="superForm.usage_mode" class="select" style="width:100%"><option value="exclusive">非自习独占</option><option value="study">自习共享</option></select></div>
               <div class="field"><label class="label">房间</label><select v-model="superForm.room_code" class="select" style="width:100%"><option v-for="r in ROOM_CODES" :key="r">{{ r }}</option></select></div>
               <div class="field"><label class="label">开始时间</label><input v-model="superForm.start_time" type="datetime-local" step="1800" class="input" style="width:100%"></div>
               <div class="field"><label class="label">结束时间</label><input v-model="superForm.end_time" type="datetime-local" step="1800" class="input" style="width:100%"></div>

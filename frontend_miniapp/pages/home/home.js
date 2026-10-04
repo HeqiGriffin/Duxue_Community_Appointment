@@ -95,6 +95,7 @@ Page({
       statusClass: meta[1],
       timeText: `${campusTime(item.start_time)} - ${campusTime(item.end_time).split(' ').pop()}`,
       roomText: item.room_code || item.requested_room_code || '待分配',
+      usageModeText: item.usage_mode === 'study' ? '自习共享' : '非自习独占',
       canCheckin,
       canUploadCleanup,
       canAppeal: item.status === 'rejected',

@@ -18,6 +18,12 @@ from api.auth import require_admin, require_normal_account, require_password_cha
 from config import SessionLocal, get_db
 from core.ai_prompt import AIAuditResult, audit_booking_with_ai
 from core.room_policy import ROOM_CATALOG, ROOM_CODES
+from core.room_state import (
+    ROOM_ALLOCATION_MUTEX,
+    available_room_codes as shared_available_room_codes,
+    recommended_study_room,
+    room_states,
+)
 from models.appeals import Appeal, AppealStatus, AppealType
 from models.bookings import AuditSource, Booking, BookingSlotLock, BookingStatus
 from models.users import User
@@ -42,6 +48,7 @@ class BookingCreateRequest(BaseModel):
     start_time: datetime
     end_time: datetime
     room_code: str = Field(min_length=1, max_length=32)
+    usage_mode: Literal["study", "exclusive"] = "exclusive"
     people_count: int = Field(default=1, ge=1, le=500)
     purpose: str = Field(min_length=2, max_length=1000)
 
@@ -52,11 +59,20 @@ class RoomAvailabilityItem(BaseModel):
     capacity_hint: int | None
     suitable: list[str]
     description: str
+    occupancy_mode: str
+    state_text: str
+    study_people: int = 0
+    study_booking_count: int = 0
+    remaining_capacity: int | None = None
+    recommended: bool = False
 
 
 class RoomAvailabilityResponse(BaseModel):
     start_time: datetime
     end_time: datetime
+    usage_mode: Literal["study", "exclusive"]
+    recommended_room_code: str | None = None
+    allocation_note: str | None = None
     rooms: list[RoomAvailabilityItem]
 
 
@@ -69,6 +85,7 @@ class AdminReviewRequest(BaseModel):
 class SuperBookingRequest(BaseModel):
     user_id: int
     room_code: str = Field(min_length=1, max_length=32)
+    usage_mode: Literal["study", "exclusive"] = "exclusive"
     start_time: datetime
     end_time: datetime
     people_count: int = Field(default=1, ge=1, le=500)
@@ -80,10 +97,12 @@ class BookingResponse(BaseModel):
     user_id: int
     purpose: str
     people_count: int
+    usage_mode: Literal["study", "exclusive"]
     intent_type: str | None
     candidate_rooms: list[str]
     requested_room_code: str | None
     room_code: str | None
+    allocation_note: str | None
     start_time: datetime
     end_time: datetime
     duration_minutes: int
@@ -134,10 +153,16 @@ def _serialize(booking: Booking) -> BookingResponse:
         user_id=booking.user_id,
         purpose=booking.purpose,
         people_count=booking.people_count,
+        usage_mode=(booking.usage_mode if booking.usage_mode in {"study", "exclusive"} else "exclusive"),
         intent_type=booking.intent_type,
         candidate_rooms=_candidate_rooms(booking),
         requested_room_code=booking.requested_room_code,
         room_code=booking.room_code,
+        allocation_note=(
+            f"为集中安排自习，系统已从 {booking.requested_room_code} 调剂至 {booking.room_code}"
+            if booking.usage_mode == "study" and booking.room_code and booking.requested_room_code and booking.room_code != booking.requested_room_code
+            else None
+        ),
         start_time=booking.start_time,
         end_time=booking.end_time,
         duration_minutes=minutes,
@@ -298,6 +323,32 @@ def _sync_booking_appeal(
     db.add(appeal)
 
 
+def _user_has_overlap(
+    db: Session,
+    *,
+    user_id: int,
+    start_time: datetime,
+    end_time: datetime,
+    exclude_booking_id: int | None = None,
+) -> bool:
+    statuses = [
+        BookingStatus.PENDING_AI,
+        BookingStatus.PENDING_MANUAL,
+        BookingStatus.APPROVED,
+        BookingStatus.ACTIVE,
+        BookingStatus.AWAITING_CLEANUP,
+    ]
+    stmt = select(Booking.id).where(
+        Booking.user_id == user_id,
+        Booking.status.in_(statuses),
+        Booking.start_time < end_time,
+        Booking.end_time > start_time,
+    )
+    if exclude_booking_id is not None:
+        stmt = stmt.where(Booking.id != exclude_booking_id)
+    return db.scalar(stmt.limit(1)) is not None
+
+
 def approve_booking_record(
     db: Session,
     *,
@@ -307,42 +358,88 @@ def approve_booking_record(
     preferred_room: str | None = None,
     review_reason: str | None = None,
 ) -> Booking:
-    """审批通过并原子抢占房间；供 AI、管理员和 scheduler 共用。"""
+    """审批通过并原子分配房间；自习共享，非自习独占。"""
     if booking.status not in {BookingStatus.PENDING_AI, BookingStatus.PENDING_MANUAL}:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="当前订单状态不可再次审批")
 
     _check_dynamic_duration(db, booking)
 
-    candidates = _candidate_rooms(booking)
-    if preferred_room:
-        preferred_room = preferred_room.upper().strip()
-        if preferred_room not in ROOM_CODES:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="未知房间编号")
-        candidates = [preferred_room]
+    with ROOM_ALLOCATION_MUTEX:
+        if booking.usage_mode == "study":
+            room_code = recommended_study_room(
+                db,
+                start_time=booking.start_time,
+                end_time=booking.end_time,
+                people_count=booking.people_count,
+                exclude_booking_id=booking.id,
+            )
+            if room_code:
+                # 自习不创建独占 slot lock；容量与跨用途冲突由共享状态规则控制。
+                _release_locks(db, booking.id)
+                booking.room_code = room_code
+                booking.status = BookingStatus.APPROVED
+                booking.audit_source = source
+                booking.reviewed_by = reviewer_id
+                booking.reviewed_at = datetime.now(timezone.utc)
+                if review_reason and source == AuditSource.AI:
+                    booking.ai_reason = review_reason
+                db.add(booking)
+                db.commit()
+                db.refresh(booking)
+                return booking
 
-    for room_code in candidates:
-        if _try_lock_room(db, booking=booking, room_code=room_code):
-            booking.room_code = room_code
-            booking.status = BookingStatus.APPROVED
+            booking.status = BookingStatus.INVALIDATED
             booking.audit_source = source
             booking.reviewed_by = reviewer_id
             booking.reviewed_at = datetime.now(timezone.utc)
-            if review_reason:
-                booking.ai_reason = review_reason if source == AuditSource.AI else booking.ai_reason
+            booking.rejection_reason = "审批时 A101/A102 均无法容纳该时段的新增自习人数"
             db.add(booking)
             db.commit()
             db.refresh(booking)
             return booking
 
-    booking.status = BookingStatus.INVALIDATED
-    booking.audit_source = source
-    booking.reviewed_by = reviewer_id
-    booking.reviewed_at = datetime.now(timezone.utc)
-    booking.rejection_reason = "审批通过时所有候选房间对应时段均已被更早通过的订单占用"
-    db.add(booking)
-    db.commit()
-    db.refresh(booking)
-    return booking
+        candidates = _candidate_rooms(booking)
+        if preferred_room:
+            preferred_room = preferred_room.upper().strip()
+            if preferred_room not in ROOM_CODES:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="未知房间编号")
+            candidates = [preferred_room]
+
+        available = set(
+            shared_available_room_codes(
+                db,
+                start_time=booking.start_time,
+                end_time=booking.end_time,
+                usage_mode="exclusive",
+                people_count=booking.people_count,
+                exclude_booking_id=booking.id,
+            )
+        )
+        for room_code in candidates:
+            if room_code not in available:
+                continue
+            if _try_lock_room(db, booking=booking, room_code=room_code):
+                booking.room_code = room_code
+                booking.status = BookingStatus.APPROVED
+                booking.audit_source = source
+                booking.reviewed_by = reviewer_id
+                booking.reviewed_at = datetime.now(timezone.utc)
+                if review_reason and source == AuditSource.AI:
+                    booking.ai_reason = review_reason
+                db.add(booking)
+                db.commit()
+                db.refresh(booking)
+                return booking
+
+        booking.status = BookingStatus.INVALIDATED
+        booking.audit_source = source
+        booking.reviewed_by = reviewer_id
+        booking.reviewed_at = datetime.now(timezone.utc)
+        booking.rejection_reason = "审批通过时所选房间已被其他预约占用；若房间已有自习，则仅允许新的自习预约共享"
+        db.add(booking)
+        db.commit()
+        db.refresh(booking)
+        return booking
 
 
 def apply_ai_result(db: Session, *, booking: Booking, result: AIAuditResult) -> Booking:
@@ -394,8 +491,13 @@ def process_booking_ai(booking_id: int) -> None:
             return
 
         try:
-            available_rooms = _available_room_codes(
-                db, start_time=booking.start_time, end_time=booking.end_time
+            available_rooms = shared_available_room_codes(
+                db,
+                start_time=booking.start_time,
+                end_time=booking.end_time,
+                usage_mode=booking.usage_mode,
+                people_count=booking.people_count,
+                exclude_booking_id=booking.id,
             )
             result = audit_booking_with_ai(
                 purpose=booking.purpose,
@@ -404,6 +506,7 @@ def process_booking_ai(booking_id: int) -> None:
                 end_iso=ensure_local(booking.end_time).isoformat(),
                 selected_room=booking.requested_room_code or "",
                 available_rooms=available_rooms,
+                usage_mode=booking.usage_mode,
             )
 
             apply_ai_result(
@@ -469,56 +572,95 @@ def create_booking(
     requested_room = payload.room_code.upper().strip()
     if requested_room not in ROOM_CODES:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="未知房间编号")
-    if not _room_is_available(db, room_code=requested_room, start_time=start_local, end_time=end_local):
+
+    if _user_has_overlap(
+        db, user_id=user.id, start_time=start_local, end_time=end_local
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"房间 {requested_room} 刚刚已被占用，请刷新空闲房间后重新选择",
+            detail="你在该时段已有预约或待审核申请，请勿重复占用多个空间",
+        )
+
+    states, recommended, _ = room_states(
+        db,
+        start_time=start_local,
+        end_time=end_local,
+        usage_mode=payload.usage_mode,
+        people_count=payload.people_count,
+    )
+    selected_state = next((x for x in states if x.room_code == requested_room), None)
+    if selected_state is None or not selected_state.available:
+        reason = selected_state.state_text if selected_state else "当前不可预约"
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"房间 {requested_room} 当前不可选：{reason}",
         )
 
     booking = Booking(
         user_id=user.id,
         purpose=purpose,
         people_count=payload.people_count,
+        usage_mode=payload.usage_mode,
         requested_room_code=requested_room,
         start_time=start_local,
         end_time=end_local,
         status=BookingStatus.PENDING_AI,
     )
+    # 自习仍保留用户点击的房间；最终审批时会按实时房态重新调剂。
+    if payload.usage_mode == "study" and recommended:
+        booking.candidate_rooms_json = json.dumps([recommended], ensure_ascii=False)
 
     db.add(booking)
     db.commit()
     db.refresh(booking)
 
-    # HTTP 响应发给小程序后，再继续执行 AI 审核。
-    background_tasks.add_task(
-        process_booking_ai,
-        booking.id,
-    )
-
+    background_tasks.add_task(process_booking_ai, booking.id)
     return _serialize(booking)
 
 
 @router.get("/availability", response_model=RoomAvailabilityResponse)
 def room_availability(
-    start_time: Annotated[datetime, Query()],
-    end_time: Annotated[datetime, Query()],
     _: Annotated[User, Depends(require_password_changed)],
     db: Annotated[Session, Depends(get_db)],
+    start_time: Annotated[datetime, Query()],
+    end_time: Annotated[datetime, Query()],
+    usage_mode: Annotated[Literal["study", "exclusive"], Query()] = "exclusive",
+    people_count: Annotated[int, Query(ge=1, le=500)] = 1,
 ) -> RoomAvailabilityResponse:
     start_local, end_local, _ = _validate_request_window(start_time, end_time)
-    available = set(_available_room_codes(db, start_time=start_local, end_time=end_local))
+    states, recommended, note = room_states(
+        db,
+        start_time=start_local,
+        end_time=end_local,
+        usage_mode=usage_mode,
+        people_count=people_count,
+    )
     rooms = []
-    for room_code, meta in ROOM_CATALOG.items():
+    for state in states:
+        meta = ROOM_CATALOG[state.room_code]
         rooms.append(
             RoomAvailabilityItem(
-                room_code=room_code,
-                available=room_code in available,
+                room_code=state.room_code,
+                available=state.available,
                 capacity_hint=meta.get("capacity_hint"),
                 suitable=[str(x) for x in meta.get("suitable", [])],
                 description=str(meta.get("description") or ""),
+                occupancy_mode=state.occupancy_mode,
+                state_text=state.state_text,
+                study_people=state.study_people,
+                study_booking_count=state.study_booking_count,
+                remaining_capacity=state.remaining_capacity,
+                recommended=state.room_code == recommended,
             )
         )
-    return RoomAvailabilityResponse(start_time=start_local, end_time=end_local, rooms=rooms)
+    return RoomAvailabilityResponse(
+        start_time=start_local,
+        end_time=end_local,
+        usage_mode=usage_mode,
+        recommended_room_code=recommended,
+        allocation_note=note,
+        rooms=rooms,
+    )
 
 
 @router.get("/me", response_model=BookingListResponse)
@@ -606,7 +748,7 @@ def export_bookings_excel(
     ws.title = "预约记录"
     ws.append([
         "预约ID", "姓名", "学号/工号", "班级", "用途", "AI内部意图", "房间", "开始时间", "结束时间",
-        "人数", "用户选择房间", "状态", "AI决定", "AI理由", "审核来源", "驳回/失效原因", "离场照片", "OCR结果",
+        "人数", "预约方式", "用户选择房间", "状态", "AI决定", "AI理由", "审核来源", "驳回/失效原因", "离场照片", "OCR结果",
         "清扫核验状态", "违规", "违规原因", "创建时间",
     ])
     for booking, user in rows:
@@ -614,7 +756,7 @@ def export_bookings_excel(
             booking.id, user.name, user.login_id, user.class_name, booking.purpose, booking.intent_type, booking.room_code,
             ensure_local(booking.start_time).strftime("%Y-%m-%d %H:%M"),
             ensure_local(booking.end_time).strftime("%Y-%m-%d %H:%M"),
-            booking.people_count, booking.requested_room_code, booking.status.value, booking.ai_decision, booking.ai_reason,
+            booking.people_count, booking.usage_mode, booking.requested_room_code, booking.status.value, booking.ai_decision, booking.ai_reason,
             booking.audit_source.value if booking.audit_source else None, booking.rejection_reason,
             (f"/api/cleanup/admin/{booking.id}/photo" if booking.cleanup_photo_path else None), booking.ocr_result, booking.cleanup_review_status,
             "是" if booking.is_violation else "否", booking.violation_reason,
@@ -706,7 +848,8 @@ def create_super_booking(
         user_id=target.id,
         purpose=payload.purpose.strip(),
         people_count=payload.people_count,
-        intent_type="admin_super_booking",
+        usage_mode=payload.usage_mode,
+        intent_type=("study" if payload.usage_mode == "study" else "admin_super_booking"),
         candidate_rooms_json=json.dumps([room_code], ensure_ascii=False),
         requested_room_code=room_code,
         start_time=start_local,

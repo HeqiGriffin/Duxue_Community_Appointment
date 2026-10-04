@@ -126,3 +126,7 @@ tr:hover td { background: #fbfdff; }
   table { font-size: 11px; }
   th, td { padding: 7px; }
 }
+.check-grid { display:grid; grid-template-columns:1fr; gap:9px; margin:14px 0; color:#344054; font-size:13px; }
+.check-grid label { display:flex; gap:8px; align-items:center; }
+.occupant-list { margin-top:12px; display:grid; gap:10px; }
+.occupant-item { padding:10px; border-radius:10px; background:#f8fafc; color:#475467; line-height:1.55; font-size:13px; }

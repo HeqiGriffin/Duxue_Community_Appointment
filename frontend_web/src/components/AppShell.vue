@@ -24,12 +24,14 @@ function logout() { clearSession(); router.replace('/login') }
           <router-link to="/admin/bookings">预约 / 违规管理</router-link>
           <router-link to="/admin/schedule">值班排班</router-link>
           <router-link to="/admin/appeals">申诉处理</router-link>
+          <router-link to="/admin/duty-history">值班记录</router-link>
+          <router-link to="/admin/duty-terminal">值班电脑绑定</router-link>
           <router-link to="/admin/export">数据导出</router-link>
         </template>
         <template v-if="canDuty">
           <div class="nav-section">值班工作台</div>
+          <router-link to="/duty/handover">值班任务 / 巡视</router-link>
           <router-link to="/duty/rooms">实时房间雷达</router-link>
-          <router-link to="/duty/handover">交接班打卡</router-link>
           <router-link to="/duty/print">打印中心</router-link>
         </template>
       </nav>
