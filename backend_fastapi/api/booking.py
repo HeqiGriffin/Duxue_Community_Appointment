@@ -6,7 +6,7 @@ from io import BytesIO
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from pydantic import BaseModel, Field
@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.auth import require_admin, require_normal_account, require_password_changed
-from config import get_db
+from config import SessionLocal, get_db
 from core.ai_prompt import AIAuditResult, ROOM_CODES, audit_booking_with_ai
 from models.bookings import AuditSource, Booking, BookingSlotLock, BookingStatus
 from models.users import User
@@ -306,13 +306,81 @@ def apply_ai_result(db: Session, *, booking: Booking, result: AIAuditResult) -> 
     return approve_booking_record(db, booking=booking, source=AuditSource.AI, review_reason=result.reason)
 
 
+def process_booking_ai(booking_id: int) -> None:
+    """响应返回后继续处理 AI 审核，避免外部 AI 延迟拖死小程序请求。"""
+    with SessionLocal() as db:
+        booking = db.get(Booking, booking_id)
+
+        if booking is None or booking.status != BookingStatus.PENDING_AI:
+            return
+
+        try:
+            result = audit_booking_with_ai(
+                purpose=booking.purpose,
+                people_count=booking.people_count,
+                start_iso=ensure_local(booking.start_time).isoformat(),
+                end_iso=ensure_local(booking.end_time).isoformat(),
+            )
+
+            apply_ai_result(
+                db,
+                booking=booking,
+                result=result,
+            )
+
+        except HTTPException as exc:
+            db.rollback()
+
+            booking = db.get(Booking, booking_id)
+            if booking is None or booking.status != BookingStatus.PENDING_AI:
+                return
+
+            if exc.status_code == status.HTTP_409_CONFLICT:
+                booking.status = BookingStatus.REJECTED
+                booking.audit_source = AuditSource.AI
+                booking.reviewed_at = datetime.now(timezone.utc)
+                booking.rejection_reason = str(exc.detail)
+
+            else:
+                booking.status = BookingStatus.PENDING_MANUAL
+                booking.ai_decision = "manual"
+                booking.ai_reason = (
+                    f"AI 后台处理异常，已转人工：HTTP {exc.status_code}"
+                )
+                booking.ai_confidence = 0
+
+            db.add(booking)
+            db.commit()
+
+        except Exception as exc:
+            db.rollback()
+
+            booking = db.get(Booking, booking_id)
+            if booking is None or booking.status != BookingStatus.PENDING_AI:
+                return
+
+            booking.status = BookingStatus.PENDING_MANUAL
+            booking.ai_decision = "manual"
+            booking.ai_reason = (
+                f"AI 后台处理异常，已转人工：{type(exc).__name__}"
+            )
+            booking.ai_confidence = 0
+
+            db.add(booking)
+            db.commit()
+
+
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
 def create_booking(
     payload: BookingCreateRequest,
+    background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(require_normal_account)],
     db: Annotated[Session, Depends(get_db)],
 ) -> BookingResponse:
-    start_local, end_local, _ = _validate_request_window(payload.start_time, payload.end_time)
+    start_local, end_local, _ = _validate_request_window(
+        payload.start_time,
+        payload.end_time,
+    )
     purpose = payload.purpose.strip()
 
     booking = Booking(
@@ -323,30 +391,17 @@ def create_booking(
         end_time=end_local,
         status=BookingStatus.PENDING_AI,
     )
+
     db.add(booking)
     db.commit()
     db.refresh(booking)
 
-    result = audit_booking_with_ai(
-        purpose=purpose,
-        people_count=payload.people_count,
-        start_iso=start_local.isoformat(),
-        end_iso=end_local.isoformat(),
+    # HTTP 响应发给小程序后，再继续执行 AI 审核。
+    background_tasks.add_task(
+        process_booking_ai,
+        booking.id,
     )
-    try:
-        booking = apply_ai_result(db, booking=booking, result=result)
-    except HTTPException as exc:
-        # AI 已判断可通过，但动态时长规则不允许：直接退回并把原因明确给用户。
-        if exc.status_code == status.HTTP_409_CONFLICT:
-            booking.status = BookingStatus.REJECTED
-            booking.audit_source = AuditSource.AI
-            booking.reviewed_at = datetime.now(timezone.utc)
-            booking.rejection_reason = str(exc.detail)
-            db.add(booking)
-            db.commit()
-            db.refresh(booking)
-        else:
-            raise
+
     return _serialize(booking)
 
 

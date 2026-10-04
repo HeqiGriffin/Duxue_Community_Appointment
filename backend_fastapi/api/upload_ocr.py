@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -34,6 +35,11 @@ class CleanupUploadResponse(BaseModel):
     ocr_text: str | None
     id_distance: int | None
     uploaded_at: datetime
+
+
+class CleanupCloudUploadRequest(BaseModel):
+    temp_url: str = Field(min_length=8, max_length=4096)
+    camera_source: str = "camera"
 
 
 class CleanupReviewRequest(BaseModel):
@@ -175,6 +181,189 @@ async def upload_cleanup_photo(
     booking.status = BookingStatus.COMPLETED
     db.add(booking)
     db.commit()
+
+    return CleanupUploadResponse(
+        booking_id=booking.id,
+        status=booking.status,
+        review_status=review_status,
+        ocr_text=ocr_text,
+        id_distance=distance,
+        uploaded_at=now_utc,
+    )
+
+
+@router.post("/{booking_id}/cloud", response_model=CleanupUploadResponse)
+def upload_cleanup_photo_cloud(
+    booking_id: int,
+    payload: CleanupCloudUploadRequest,
+    user: Annotated[User, Depends(require_password_changed)],
+    db: Annotated[Session, Depends(get_db)],
+) -> CleanupUploadResponse:
+    """接收 CloudBase 云存储临时 URL，并保存为正式离场照片。"""
+
+    booking = db.get(Booking, booking_id)
+
+    if booking is None or booking.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="预约不存在",
+        )
+
+    if booking.status not in {
+        BookingStatus.ACTIVE,
+        BookingStatus.AWAITING_CLEANUP,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="当前预约状态不可提交离场照片",
+        )
+
+    if datetime.now(APP_TZ) < ensure_local(booking.end_time):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="预约尚未结束，不能提前提交离场照片",
+        )
+
+    if payload.camera_source != "camera":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="客户端必须使用实时相机拍摄",
+        )
+
+    # 只允许腾讯云存储 HTTPS 临时地址，避免任意 URL / SSRF。
+    parsed = urlparse(payload.temp_url)
+    host = (parsed.hostname or "").lower()
+
+    allowed_host = (
+        host.endswith(".tcb.qcloud.la")
+        or host.endswith(".myqcloud.com")
+    )
+
+    if parsed.scheme != "https" or not allowed_host:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="不是受信任的 CloudBase 临时文件地址",
+        )
+
+    try:
+        with httpx.Client(
+            timeout=httpx.Timeout(20.0, connect=5.0),
+            follow_redirects=True,
+        ) as client:
+            response = client.get(payload.temp_url)
+            response.raise_for_status()
+            image_bytes = response.content
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="读取云端临时照片失败",
+        ) from exc
+
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+
+    if len(image_bytes) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="照片文件过大",
+        )
+
+    # 不信任 URL 后缀或 Content-Type，直接读取真实图片格式。
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        image_format = (image.format or "").upper()
+        image.verify()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="云端文件不是有效图片",
+        ) from exc
+
+    image_types = {
+        "JPEG": ("image/jpeg", ".jpg"),
+        "PNG": ("image/png", ".png"),
+        "WEBP": ("image/webp", ".webp"),
+    }
+
+    detected = image_types.get(image_format)
+
+    if detected is None:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="仅支持 JPEG/PNG/WebP 图片",
+        )
+
+    content_type, suffix = detected
+
+    path = _save_image(
+        image_bytes,
+        suffix,
+        booking.id,
+    )
+
+    ocr_text = _call_ocr(
+        image_bytes,
+        f"cleanup{suffix}",
+        content_type,
+    )
+
+    recognized, distance = _extract_best_student_id(
+        ocr_text or "",
+        user.login_id,
+    )
+
+    if ocr_text is None:
+        review_status = "manual_required"
+        ocr_result = json.dumps(
+            {
+                "status": "ocr_unavailable",
+                "recognized": None,
+            },
+            ensure_ascii=False,
+        )
+
+    elif distance is not None and distance <= 1:
+        review_status = "auto_pass"
+        ocr_result = json.dumps(
+            {
+                "status": "matched",
+                "recognized": recognized,
+                "distance": distance,
+                "text": ocr_text[:5000],
+            },
+            ensure_ascii=False,
+        )
+
+    else:
+        review_status = "manual_required"
+        ocr_result = json.dumps(
+            {
+                "status": "mismatch",
+                "recognized": recognized,
+                "distance": distance,
+                "text": ocr_text[:5000],
+            },
+            ensure_ascii=False,
+        )
+
+    now_utc = datetime.now(timezone.utc)
+
+    booking.cleanup_photo_path = path
+    booking.ocr_result = ocr_result
+    booking.cleanup_review_status = review_status
+    booking.checked_out_at = now_utc
+
+    booking.cleanup_deadline_at = (
+        booking.cleanup_deadline_at
+        or cleanup_deadline(booking.end_time)
+    )
+
+    # 上传成功立即完成闭环并解除下一次预约限制。
+    # 管理员后续审核不合格时再冻结。
+    booking.status = BookingStatus.COMPLETED
+
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
 
     return CleanupUploadResponse(
         booking_id=booking.id,

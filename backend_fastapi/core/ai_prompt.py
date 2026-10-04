@@ -200,7 +200,7 @@ def audit_booking_with_ai(*, purpose: str, people_count: int, start_iso: str, en
     }
 
     try:
-        with httpx.Client(timeout=15.0) as client:
+        with httpx.Client(timeout=httpx.Timeout(45.0, connect=5.0)) as client:
             response = client.post(_chat_completions_url(settings.ai_base_url), headers=headers, json=body)
             response.raise_for_status()
             payload = response.json()

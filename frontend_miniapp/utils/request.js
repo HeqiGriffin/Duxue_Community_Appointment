@@ -206,13 +206,112 @@ function request(options) {
 
 // upload函数：仅模拟器本地可用，真机上传暂不支持
 function upload(options) {
-  const { url, filePath, name = 'photo', formData = {}, auth = true, loading = true, headers = {} } = options
+  const {
+    url,
+    filePath,
+    name = 'photo',
+    formData = {},
+    auth = true,
+    loading = true,
+    headers = {}
+  } = options
+
   const session = getSession()
-  const header = { ...headers }
-  if (auth && session && session.accessToken) {
-    header.Authorization = `Bearer ${session.accessToken}`
+
+  if (loading) {
+    wx.showLoading({
+      title: '正在上传',
+      mask: true
+    })
   }
-  if (loading) wx.showLoading({ title: '正在上传', mask: true })
+
+  // ===== 真机：CloudBase 临时存储 + AnyService =====
+  if (isUseCloudContainer()) {
+    let cloudFileId = ''
+
+    const randomPart = Math.random()
+      .toString(36)
+      .slice(2, 10)
+
+    const cloudPath =
+      `duxue-temp/cleanup/${Date.now()}_${randomPart}.jpg`
+
+    return wx.cloud.uploadFile({
+      cloudPath,
+      filePath
+    })
+      .then(uploadRes => {
+        cloudFileId = uploadRes.fileID
+
+        if (!cloudFileId) {
+          throw new Error('云存储未返回文件 ID')
+        }
+
+        return wx.cloud.getTempFileURL({
+          fileList: [cloudFileId]
+        })
+      })
+      .then(urlRes => {
+        const item =
+          urlRes.fileList &&
+          urlRes.fileList[0]
+
+        if (
+          !item ||
+          item.status !== 0 ||
+          !item.tempFileURL
+        ) {
+          throw new Error(
+            (item && item.errMsg) ||
+            '无法获取照片临时地址'
+          )
+        }
+
+        // 继续使用已经打通的 AnyService JSON 通道。
+        return request({
+          url: `${url}/cloud`,
+          method: 'POST',
+          data: {
+            temp_url: item.tempFileURL,
+            camera_source:
+              formData.camera_source || 'camera'
+          },
+          auth,
+          loading: false,
+          headers
+        })
+      })
+      .finally(() => {
+        // FastAPI 已保存正式副本，因此 CloudBase 这里只作为中转。
+        if (cloudFileId) {
+          wx.cloud.deleteFile({
+            fileList: [cloudFileId]
+          }).catch(err => {
+            console.warn(
+              '临时云文件删除失败：',
+              err
+            )
+          })
+        }
+
+        if (loading) {
+          wx.hideLoading()
+        }
+      })
+  }
+
+  // ===== 微信开发者工具：原来的本地 multipart 调试 =====
+  const header = { ...headers }
+
+  if (
+    auth &&
+    session &&
+    session.accessToken
+  ) {
+    header.Authorization =
+      `Bearer ${session.accessToken}`
+  }
+
   return new Promise((resolve, reject) => {
     wx.uploadFile({
       url: `${getBaseUrl()}${url}`,
@@ -221,25 +320,58 @@ function upload(options) {
       formData,
       header,
       timeout: 30000,
+
       success(res) {
         let data = res.data
-        try { data = JSON.parse(res.data) } catch (e) {}
-        if (res.statusCode >= 200 && res.statusCode < 300) {
+
+        try {
+          data = JSON.parse(res.data)
+        } catch (e) {}
+
+        if (
+          res.statusCode >= 200 &&
+          res.statusCode < 300
+        ) {
           resolve(data)
           return
         }
-        const fakeRes = { statusCode: res.statusCode, data }
-        const error = new Error(extractError(fakeRes))
-        error.statusCode = res.statusCode
+
+        const fakeRes = {
+          statusCode: res.statusCode,
+          data
+        }
+
+        const error =
+          new Error(extractError(fakeRes))
+
+        error.statusCode =
+          res.statusCode
+
         error.data = data
-        if (res.statusCode === 401 && auth) redirectLogin()
+
+        if (
+          res.statusCode === 401 &&
+          auth
+        ) {
+          redirectLogin()
+        }
+
         reject(error)
       },
+
       fail(err) {
-        reject(new Error(err.errMsg || '图片上传失败'))
+        reject(
+          new Error(
+            err.errMsg ||
+            '图片上传失败'
+          )
+        )
       },
+
       complete() {
-        if (loading) wx.hideLoading()
+        if (loading) {
+          wx.hideLoading()
+        }
       }
     })
   })
