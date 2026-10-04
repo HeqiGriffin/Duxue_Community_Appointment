@@ -28,10 +28,10 @@
       <view class="quick-title">发起预约</view>
       <view class="quick-note">自然语言填写用途</view>
     </view>
-    <view class="quick-card" bindtap="goDoorList">
-      <view class="quick-icon qr-icon">▦</view>
+    <view class="quick-card" bindtap="goCheckinList">
+      <view class="quick-icon">✓</view>
       <view class="quick-title">签到 / 离场</view>
-      <view class="quick-note">动态二维码与实拍</view>
+      <view class="quick-note">预约签到与离场实拍</view>
     </view>
   </view>
 
@@ -69,7 +69,7 @@
     <view class="booking-meta">{{item.timeText}} · {{item.people_count}} 人</view>
     <view class="booking-reason" wx:if="{{item.rejection_reason}}">原因：{{item.rejection_reason}}</view>
     <view class="booking-reason" wx:elif="{{item.ai_guidance && item.status === 'rejected'}}">建议：{{item.ai_guidance}}</view>
-    <view class="action-hint" wx:if="{{item.canDoor}}">当前可签到开门 →</view>
+    <view class="action-hint" wx:if="{{item.canCheckin}}">当前可签到 →</view>
     <view class="action-hint warning-hint" wx:elif="{{item.canUploadCleanup}}">请完成离场实拍 →</view>
   </view>
 </view>

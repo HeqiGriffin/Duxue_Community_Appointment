@@ -78,6 +78,9 @@ class BookingResponse(BaseModel):
     ai_confidence: int | None
     audit_source: AuditSource | None
     rejection_reason: str | None
+    checked_in_at: datetime | None
+    checked_out_at: datetime | None
+    cleanup_deadline_at: datetime | None
     cleanup_review_status: str | None
     is_violation: bool
     violation_reason: str | None
@@ -127,6 +130,9 @@ def _serialize(booking: Booking) -> BookingResponse:
         ai_confidence=booking.ai_confidence,
         audit_source=booking.audit_source,
         rejection_reason=booking.rejection_reason,
+        checked_in_at=booking.checked_in_at,
+        checked_out_at=booking.checked_out_at,
+        cleanup_deadline_at=booking.cleanup_deadline_at,
         cleanup_review_status=booking.cleanup_review_status,
         is_violation=booking.is_violation,
         violation_reason=booking.violation_reason,

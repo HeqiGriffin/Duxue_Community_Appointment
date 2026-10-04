@@ -3,13 +3,13 @@ const { request, getSession, updateSessionFromProfile, clearSession } = require(
 const STATUS_META = {
   pending_ai: ['AI 审核中', 'pending'],
   pending_manual: ['待人工审核', 'pending'],
-  approved: ['已通过', 'success'],
+  approved: ['待签到', 'success'],
   rejected: ['已驳回', 'danger'],
   invalidated: ['场地冲突失效', 'danger'],
-  active: ['使用中', 'active'],
+  active: ['已签到', 'active'],
   awaiting_cleanup: ['待离场实拍', 'warning'],
   completed: ['已完成', 'done'],
-  expired: ['已过期', 'muted'],
+  expired: ['未签到已过期', 'muted'],
   cancelled: ['已取消', 'muted']
 }
 
@@ -87,7 +87,7 @@ Page({
     const now = Date.now()
     const startMs = toCampusMs(item.start_time)
     const endMs = toCampusMs(item.end_time)
-    const canDoor = ['approved', 'active'].includes(item.status) && now >= startMs && now < endMs
+    const canCheckin = item.status === 'approved' && now >= startMs - 60 * 60 * 1000 && now <= startMs + 60 * 60 * 1000
     const canUploadCleanup = ['active', 'awaiting_cleanup'].includes(item.status) && now >= endMs
     return {
       ...item,
@@ -95,9 +95,9 @@ Page({
       statusClass: meta[1],
       timeText: `${campusTime(item.start_time)} - ${campusTime(item.end_time).split(' ').pop()}`,
       roomText: item.room_code || '审核通过后分配',
-      canDoor,
+      canCheckin,
       canUploadCleanup,
-      showAction: canDoor || canUploadCleanup
+      showAction: canCheckin || canUploadCleanup
     }
   },
 
@@ -109,18 +109,18 @@ Page({
     wx.navigateTo({ url: '/pages/appointment/appointment' })
   },
 
-  goDoorList() {
-    const candidate = this.data.bookings.find(x => x.canDoor || x.canUploadCleanup || ['approved', 'active', 'awaiting_cleanup'].includes(x.status))
+  goCheckinList() {
+    const candidate = this.data.bookings.find(x => x.canCheckin || x.canUploadCleanup || ['approved', 'active', 'awaiting_cleanup'].includes(x.status))
     if (!candidate) {
       wx.showToast({ title: '暂无可签到或待离场的预约', icon: 'none' })
       return
     }
-    wx.navigateTo({ url: `/pages/door_access/door_access?bookingId=${candidate.id}` })
+    wx.navigateTo({ url: `/pages/checkin/checkin?bookingId=${candidate.id}` })
   },
 
   openBooking(e) {
     const id = Number(e.currentTarget.dataset.id)
-    wx.navigateTo({ url: `/pages/door_access/door_access?bookingId=${id}` })
+    wx.navigateTo({ url: `/pages/checkin/checkin?bookingId=${id}` })
   },
 
   goAppeal() { wx.navigateTo({ url: '/pages/online_appeal/online_appeal' }) },

@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from api.auth import router as auth_router
 from api.booking import router as booking_router
-from api.door_proxy import router as door_router
+from api.checkin import router as checkin_router
 from api.upload_ocr import router as cleanup_router
 from api.appeal import router as appeal_router
 from api.duty import router as duty_router
@@ -55,7 +55,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
@@ -70,7 +70,7 @@ if settings.parsed_cors_origins:
 
 app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(booking_router, prefix=settings.api_prefix)
-app.include_router(door_router, prefix=settings.api_prefix)
+app.include_router(checkin_router, prefix=settings.api_prefix)
 app.include_router(cleanup_router, prefix=settings.api_prefix)
 app.include_router(appeal_router, prefix=settings.api_prefix)
 app.include_router(duty_router, prefix=settings.api_prefix)
@@ -78,4 +78,4 @@ app.include_router(duty_router, prefix=settings.api_prefix)
 
 @app.get("/health", tags=["system"])
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "backend_fastapi", "version": "0.3.0"}
+    return {"status": "ok", "service": "backend_fastapi", "version": "0.4.0"}

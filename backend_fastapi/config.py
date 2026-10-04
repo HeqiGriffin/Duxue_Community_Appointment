@@ -1,6 +1,6 @@
 """全局配置与数据库连接。
 
-第一阶段仅使用环境变量，不把数据库密码、AI Key、i大工 Cookie 等敏感信息写进代码。
+第一阶段仅使用环境变量，不把数据库密码、AI Key 等敏感信息写进代码。
 默认数据库为 SQLite，部署时可通过 DATABASE_URL 切换为 MySQL/PostgreSQL。
 """
 from __future__ import annotations
@@ -33,14 +33,6 @@ class Settings:
     ai_api_key: str = os.getenv("AI_API_KEY", "")
     ai_base_url: str = os.getenv("AI_BASE_URL", "")
     ai_model: str = os.getenv("AI_MODEL", "")
-    idut_cookie: str = os.getenv("IDUT_COOKIE", "")
-    # i大工动态二维码实际接口由部署环境注入；不把抓包地址或 Cookie 写死在仓库。
-    idut_qr_url: str = os.getenv("IDUT_QR_URL", "")
-    idut_referer: str = os.getenv("IDUT_REFERER", "https://card.m.dlut.edu.cn/")
-    idut_user_agent: str = os.getenv(
-        "IDUT_USER_AGENT",
-        "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
-    )
 
     # OCR 可接学校已有 OCR、云 OCR 或自建兼容服务。未配置时照片仍会收件，但转人工核验。
     ocr_api_url: str = os.getenv("OCR_API_URL", "")

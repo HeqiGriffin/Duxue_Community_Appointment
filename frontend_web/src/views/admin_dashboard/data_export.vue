@@ -29,7 +29,7 @@ async function download() {
       <div class="form-grid">
         <div class="field"><label class="label">开始日期</label><input v-model="startDate" class="input" type="date" style="width:100%"></div>
         <div class="field"><label class="label">结束日期</label><input v-model="endDate" class="input" type="date" style="width:100%"></div>
-        <div class="field"><label class="label">预约状态</label><select v-model="status" class="select" style="width:100%"><option value="">全部</option><option value="pending_manual">待人工审核</option><option value="approved">已通过</option><option value="active">使用中</option><option value="awaiting_cleanup">待清扫</option><option value="completed">已完结</option><option value="rejected">已驳回</option><option value="invalidated">冲突失效</option><option value="cancelled">已取消</option></select></div>
+        <div class="field"><label class="label">预约状态</label><select v-model="status" class="select" style="width:100%"><option value="">全部</option><option value="pending_manual">待人工审核</option><option value="approved">已通过</option><option value="active">已签到</option><option value="awaiting_cleanup">待清扫</option><option value="completed">已完结</option><option value="rejected">已驳回</option><option value="invalidated">冲突失效</option><option value="cancelled">已取消</option></select></div>
       </div>
       <div style="margin-top:18px"><button class="btn btn-primary" :disabled="loading" @click="download">{{ loading ? '生成中…' : '导出 Excel' }}</button></div>
     </div>

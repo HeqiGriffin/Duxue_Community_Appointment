@@ -3,7 +3,7 @@
     "pages/login/login",
     "pages/home/home",
     "pages/appointment/appointment",
-    "pages/door_access/door_access",
+    "pages/checkin/checkin",
     "pages/online_appeal/online_appeal"
   ],
   "window": {

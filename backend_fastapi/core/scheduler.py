@@ -5,11 +5,11 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from api.booking import approve_booking_record
 from config import SessionLocal
-from models.bookings import AuditSource, Booking, BookingStatus
+from models.bookings import AuditSource, Booking, BookingSlotLock, BookingStatus
 from models.users import User, UserStatus
 from utils.time_calc import APP_TZ, cleanup_deadline, ensure_local
 
@@ -52,9 +52,13 @@ def approve_next_day_pending(now: datetime | None = None) -> dict[str, int]:
 
 
 def advance_booking_states(now: datetime | None = None) -> dict[str, int]:
-    """推进 APPROVED -> ACTIVE -> AWAITING_CLEANUP。"""
+    """推进签到后的预约状态，并处理未签到过期。
+
+    APPROVED 不再在开始时自动变成 ACTIVE；只有学生点击签到才进入 ACTIVE。
+    签到窗口为预约开始前 1 小时至开始后 1 小时。超过窗口仍未签到则标记 EXPIRED。
+    """
     current = ensure_local(now or datetime.now(APP_TZ))
-    activated = awaiting_cleanup = 0
+    awaiting_cleanup = expired = 0
 
     with SessionLocal() as db:
         rows = db.scalars(
@@ -63,17 +67,38 @@ def advance_booking_states(now: datetime | None = None) -> dict[str, int]:
         for booking in rows:
             start = ensure_local(booking.start_time)
             end = ensure_local(booking.end_time)
-            if current >= end:
-                booking.status = BookingStatus.AWAITING_CLEANUP
-                booking.cleanup_deadline_at = cleanup_deadline(booking.end_time)
-                awaiting_cleanup += 1
+
+            if booking.status == BookingStatus.ACTIVE:
+                # 兼容升级前由旧 scheduler 自动写入的 ACTIVE：没有 checked_in_at 就不视为已签到。
+                if booking.checked_in_at is None:
+                    if current <= start + timedelta(hours=1):
+                        booking.status = BookingStatus.APPROVED
+                        db.add(booking)
+                        continue
+                    booking.status = BookingStatus.EXPIRED
+                    booking.rejection_reason = "未在预约开始时间前后 1 小时内完成签到"
+                    db.execute(delete(BookingSlotLock).where(BookingSlotLock.booking_id == booking.id))
+                    expired += 1
+                    db.add(booking)
+                    continue
+
+                if current >= end:
+                    booking.status = BookingStatus.AWAITING_CLEANUP
+                    booking.cleanup_deadline_at = cleanup_deadline(booking.end_time)
+                    awaiting_cleanup += 1
+                    db.add(booking)
+                continue
+
+            # 未签到订单在“开始时间 + 1 小时”后失效并释放占房锁。
+            if booking.status == BookingStatus.APPROVED and current > start + timedelta(hours=1):
+                booking.status = BookingStatus.EXPIRED
+                booking.rejection_reason = "未在预约开始时间前后 1 小时内完成签到"
+                db.execute(delete(BookingSlotLock).where(BookingSlotLock.booking_id == booking.id))
+                expired += 1
                 db.add(booking)
-            elif booking.status == BookingStatus.APPROVED and start <= current < end:
-                booking.status = BookingStatus.ACTIVE
-                activated += 1
-                db.add(booking)
+
         db.commit()
-    return {"activated": activated, "awaiting_cleanup": awaiting_cleanup}
+    return {"awaiting_cleanup": awaiting_cleanup, "expired": expired}
 
 
 def freeze_overdue_cleanup(now: datetime | None = None) -> dict[str, int]:

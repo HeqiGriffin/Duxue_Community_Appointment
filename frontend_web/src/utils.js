@@ -4,8 +4,8 @@ export const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周�
 
 export const statusText = {
   pending_ai: 'AI审核中', pending_manual: '待人工审核', approved: '已通过', rejected: '已驳回',
-  invalidated: '资源冲突失效', active: '使用中', awaiting_cleanup: '待清扫上传', completed: '已完结',
-  expired: '已过期', cancelled: '已取消', pending: '待处理', normal: '正常', frozen: '冻结',
+  invalidated: '资源冲突失效', active: '已签到', awaiting_cleanup: '待清扫上传', completed: '已完结',
+  expired: '未签到已过期', cancelled: '已取消', pending: '待处理', normal: '正常', frozen: '冻结',
   admin_pass: '人工核验通过', admin_reject: '人工核验不通过', auto_pass: 'OCR自动通过', manual_required: '待人工核验',
 }
 

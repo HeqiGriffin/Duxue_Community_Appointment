@@ -1,0 +1,38 @@
+<view class="container checkin-page">
+  <view class="card booking-summary" wx:if="{{booking}}">
+    <view class="summary-head">
+      <view class="room-code">{{booking.room_code || '尚未分配房间'}}</view>
+      <view class="badge">{{statusText}}</view>
+    </view>
+    <view class="purpose">{{booking.purpose}}</view>
+    <view class="muted meta">{{timeText}}</view>
+  </view>
+
+  <view class="card checkin-card" wx:if="{{booking}}">
+    <view class="step-tag">01 · 到场</view>
+    <view class="card-title">预约签到</view>
+    <view class="card-note">可在预约开始时间前 1 小时至开始后 1 小时内签到。签到成功后系统会记录到场时间。</view>
+
+    <view class="checkin-success" wx:if="{{booking.checked_in_at}}">
+      <view class="success-mark">✓</view>
+      <view>
+        <view class="success-title">已签到</view>
+        <view class="muted success-time">{{checkedInText}}</view>
+      </view>
+    </view>
+
+    <button class="btn-primary checkin-btn" wx:elif="{{canCheckin}}" loading="{{checkingIn}}" disabled="{{checkingIn}}" bindtap="doCheckin">点击签到</button>
+    <view class="not-ready" wx:else>{{checkinHint}}</view>
+  </view>
+
+  <view class="card cleanup-card" wx:if="{{booking}}">
+    <view class="step-tag orange">02 · 离场</view>
+    <view class="card-title">现场清理并实拍上传</view>
+    <view class="card-note">当前规则为预约结束后 30 分钟内完成。此入口只允许调用实时相机，不提供相册选择。</view>
+    <button class="btn-secondary cleanup-btn" wx:if="{{canCleanup}}" loading="{{uploading}}" disabled="{{uploading}}" bindtap="takeAndUpload">打开相机并提交现场照片</button>
+    <view class="not-ready" wx:elif="{{booking.status === 'completed'}}">离场照片已提交</view>
+    <view class="not-ready" wx:else>预约结束后开放离场实拍</view>
+  </view>
+
+  <view class="rule-note">超时未完成离场实拍，后端会自动冻结预约与签到权限；被冻结后可从首页进入线上申诉。</view>
+</view>

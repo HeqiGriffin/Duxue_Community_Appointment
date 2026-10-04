@@ -139,7 +139,7 @@ onMounted(refreshAll)
     <div v-if="tab === 'bookings'" class="card card-pad">
       <div class="toolbar">
         <select v-model="statusFilter" class="select" @change="loadBookings">
-          <option value="">全部状态</option><option value="pending_manual">待人工审核</option><option value="approved">已通过</option><option value="active">使用中</option><option value="awaiting_cleanup">待清扫</option><option value="completed">已完结</option><option value="rejected">已驳回</option><option value="invalidated">资源冲突失效</option><option value="cancelled">已取消</option>
+          <option value="">全部状态</option><option value="pending_manual">待人工审核</option><option value="approved">已通过</option><option value="active">已签到</option><option value="awaiting_cleanup">待清扫</option><option value="completed">已完结</option><option value="rejected">已驳回</option><option value="invalidated">资源冲突失效</option><option value="cancelled">已取消</option>
         </select>
         <button class="btn btn-secondary" @click="loadBookings">刷新</button>
         <span v-if="loading" class="loading">加载中…</span>

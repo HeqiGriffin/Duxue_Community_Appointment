@@ -33,5 +33,5 @@
     <button class="btn-primary login-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitPasswordChange">保存并进入系统</button>
   </view>
 
-  <view class="security-note">账号、预约与门禁操作均由后端鉴权。</view>
+  <view class="security-note">账号、预约与签到操作均由后端鉴权。</view>
 </view>
